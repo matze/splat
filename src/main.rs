@@ -13,6 +13,7 @@ use std::fs::{copy, create_dir_all, read_dir, write};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use tera;
+use tokio::fs;
 
 #[derive(StructOpt)]
 #[structopt(name = "splat", about = "Static photo gallery generator")]
@@ -201,8 +202,8 @@ fn is_older(first: &Path, second: &Path) -> Result<bool> {
     Ok(first.metadata()?.modified()? < second.metadata()?.modified()?)
 }
 
-fn build() -> Result<()> {
-    let config = Config::read()?;
+async fn build() -> Result<()> {
+    let config = Config::read().await?;
     let builder = Builder::new()?;
 
     if !config.input.exists() {
@@ -210,7 +211,7 @@ fn build() -> Result<()> {
     }
 
     if !config.output.exists() {
-        create_dir_all(&config.output)?;
+        fs::create_dir_all(&config.output).await?;
     }
 
     match builder.collect(&config.input)? {
@@ -219,12 +220,13 @@ fn build() -> Result<()> {
     }
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let commands = Commands::from_args();
 
     match commands {
-        Commands::Build => build(),
-        Commands::New => Config::new().write(),
+        Commands::Build => build().await,
+        Commands::New => Config::new().write().await,
     }
 }
 
