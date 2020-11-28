@@ -48,7 +48,7 @@ struct Output {
 
 struct Builder {
     extensions: HashSet<OsString>,
-    templates: tera::Tera,
+    templates: Option<tera::Tera>,
 }
 
 impl Builder {
@@ -56,16 +56,26 @@ impl Builder {
         let mut extensions = HashSet::new();
         extensions.insert(OsString::from("jpg"));
 
-        let mut templates = tera::Tera::new("_theme/templates/*.html")?;
+        let theme_path = Path::new("_theme/templates");
 
-        // We disable autoescape because we will dump a lot of path-like strings which will have to
-        // be marked as "safe" by the user.
-        templates.autoescape_on(vec![]);
+        if theme_path.exists() {
+            let mut templates = tera::Tera::new("_theme/templates/*.html")?;
 
-        Ok(Self {
-            extensions: extensions,
-            templates: templates,
-        })
+            // We disable autoescape because we will dump a lot of path-like strings which will have to
+            // be marked as "safe" by the user.
+            templates.autoescape_on(vec![]);
+
+            Ok(Self {
+                extensions: extensions,
+                templates: Some(templates),
+            })
+        }
+        else {
+            Ok(Self {
+                extensions: extensions,
+                templates: None,
+            })
+        }
     }
 
     fn collect(&self, root: &Path) -> Result<Option<Collection>> {
@@ -180,19 +190,21 @@ impl Builder {
             None => root.name.clone(),
         };
 
-        let mut context = tera::Context::new();
+        if let Some(templates) = &self.templates {
+            let mut context = tera::Context::new();
 
-        context.insert(
-            "collection",
-            &Output {
-                title: title,
-                items: items,
-                thumbnail: thumbnail,
-            },
-        );
+            context.insert(
+                "collection",
+                &Output {
+                    title: title,
+                    items: items,
+                    thumbnail: thumbnail,
+                },
+            );
 
-        let index_html = output.join("index.html");
-        write(index_html, self.templates.render("index.html", &context)?)?;
+            let index_html = output.join("index.html");
+            write(index_html, templates.render("index.html", &context)?)?;
+        }
 
         Ok(())
     }
