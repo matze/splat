@@ -245,6 +245,7 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image;
     use metadata::tests::METADATA;
     use std::fs::{create_dir, write, File};
     use tempfile::{tempdir, TempDir};
@@ -366,6 +367,45 @@ mod tests {
 
         let collection = collection.unwrap();
         assert!(collection.metadata.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn process_basic() -> Result<()> {
+        let (dir, builder) = setup()?;
+        let path = dir.path();
+        let input = path.join("input");
+        let output = path.join("output");
+
+        // Copy test.jpg, which is 900x600 pixels to the root input dir.
+        create_dir(&input)?;
+        create_dir(&output)?;
+        copy("data/test.jpg", input.join("test.jpg"))?;
+
+        let root = builder.collect(&input)?.unwrap();
+        let config = config::Config {
+            input: input,
+            output: output.clone(),
+            thumbnail: config::Thumbnail {
+                width: 300,
+                height: 200,
+            },
+            resize: None,
+        };
+
+        builder.process(&root, &config.output, &config)?;
+        let copy_name = output.join("test.jpg");
+        let thumb_name = output.join("thumbnails/test.jpg");
+
+        assert!(copy_name.exists());
+        assert!(thumb_name.exists());
+
+        let copy_dims = image::image_dimensions(copy_name)?;
+        assert_eq!(copy_dims, (900, 600));
+
+        let thumb_dims = image::image_dimensions(thumb_name)?;
+        assert_eq!(thumb_dims, (300, 200));
+
         Ok(())
     }
 }
