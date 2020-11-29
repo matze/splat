@@ -13,7 +13,6 @@ use std::fs::{copy, create_dir_all, read_dir, write};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use tera;
-use tokio::fs;
 
 #[derive(StructOpt)]
 #[structopt(name = "splat", about = "Static photo gallery generator")]
@@ -49,6 +48,7 @@ struct Output {
 struct Builder {
     extensions: HashSet<OsString>,
     templates: Option<tera::Tera>,
+    config: Config,
 }
 
 struct Pair {
@@ -141,7 +141,15 @@ fn to_operation(item: &Item, output: &Path, config: &Config) -> Result<Option<Op
 }
 
 impl Builder {
-    fn new() -> Result<Self> {
+    fn new(config: Config) -> Result<Self> {
+        if !config.input.exists() {
+            return Err(anyhow!("{:?} does not exist", config.input));
+        }
+
+        if !config.output.exists() {
+            create_dir_all(&config.output)?;
+        }
+
         let mut extensions = HashSet::new();
         extensions.insert(OsString::from("jpg"));
 
@@ -157,12 +165,21 @@ impl Builder {
             Ok(Self {
                 extensions: extensions,
                 templates: Some(templates),
+                config: config,
             })
         } else {
             Ok(Self {
                 extensions: extensions,
                 templates: None,
+                config: config,
             })
+        }
+    }
+
+    fn build(&self) -> Result<()> {
+        match self.collect(&self.config.input)? {
+            Some(collection) => self.process(collection, &self.config.output, &self.config),
+            None => Err(anyhow!("No images found")),
         }
     }
 
@@ -278,21 +295,7 @@ impl Builder {
 }
 
 async fn build() -> Result<()> {
-    let config = Config::read().await?;
-    let builder = Builder::new()?;
-
-    if !config.input.exists() {
-        return Err(anyhow!("{:?} does not exist", config.input));
-    }
-
-    if !config.output.exists() {
-        fs::create_dir_all(&config.output).await?;
-    }
-
-    match builder.collect(&config.input)? {
-        Some(collection) => builder.process(collection, &config.output, &config),
-        None => Err(anyhow!("No images found")),
-    }
+    Builder::new(Config::read().await?)?.build()
 }
 
 #[tokio::main]
@@ -313,31 +316,56 @@ mod tests {
     use std::fs::{create_dir, write, File};
     use tempfile::{tempdir, TempDir};
 
-    fn setup() -> Result<(TempDir, Builder)> {
-        Ok((tempdir()?, Builder::new()?))
+    struct Fixture {
+        builder: Builder,
+        _dir: TempDir,
+    }
+
+    fn setup(resize: Option<(u32, u32)>) -> Result<Fixture> {
+        let dir = tempdir()?;
+        let input = dir.path().join("input");
+        let output = dir.path().join("output");
+
+        create_dir_all(&input)?;
+        create_dir_all(&output)?;
+
+        let config = config::Config {
+            input: input,
+            output: output,
+            thumbnail: config::Thumbnail {
+                width: 300,
+                height: 200,
+            },
+            resize: resize.and_then(|r| Some(config::Resize {width: r.0, height: r.1})),
+        };
+
+        Ok(Fixture {
+            builder: Builder::new(config)?,
+            _dir: dir
+        })
     }
 
     #[test]
     fn empty_dir_is_none_collection() -> Result<()> {
-        let (dir, builder) = setup()?;
-        let collection = builder.collect(dir.path())?;
+        let f = setup(None)?;
+        let collection = f.builder.collect(&f.builder.config.input)?;
         assert!(collection.is_none());
         Ok(())
     }
 
     #[test]
     fn no_image_is_none_collection() -> Result<()> {
-        let (dir, builder) = setup()?;
-        File::create(dir.path().join("foo.bar"))?;
-        assert!(builder.collect(dir.path())?.is_none());
+        let f = setup(None)?;
+        File::create(f.builder.config.input.join("foo.bar"))?;
+        assert!(f.builder.collect(&f.builder.config.input)?.is_none());
         Ok(())
     }
 
     #[test]
     fn single_image_is_some_collection() -> Result<()> {
-        let (dir, builder) = setup()?;
-        File::create(dir.path().join("test.jpg"))?;
-        let collection = builder.collect(dir.path())?;
+        let f = setup(None)?;
+        File::create(f.builder.config.input.join("test.jpg"))?;
+        let collection = f.builder.collect(&f.builder.config.input)?;
         assert!(collection.is_some());
 
         let collection = collection.unwrap();
@@ -347,64 +375,62 @@ mod tests {
 
     #[test]
     fn choose_metadata_thumbnail() -> Result<()> {
-        let (dir, builder) = setup()?;
-        File::create(&dir.path().join("1.jpg"))?;
-        File::create(&dir.path().join("2.jpg"))?;
-        File::create(&dir.path().join("3.jpg"))?;
-        write(dir.path().join("index.md"), "Thumbnail: 2.jpg")?;
+        let f = setup(None)?;
+        File::create(&f.builder.config.input.join("1.jpg"))?;
+        File::create(&f.builder.config.input.join("2.jpg"))?;
+        File::create(&f.builder.config.input.join("3.jpg"))?;
+        write(f.builder.config.input.join("index.md"), "Thumbnail: 2.jpg")?;
 
-        let collection = builder.collect(dir.path())?.unwrap();
-        assert_eq!(collection.thumbnail, dir.path().join("2.jpg"));
+        let collection = f.builder.collect(&f.builder.config.input)?.unwrap();
+        assert_eq!(collection.thumbnail, f.builder.config.input.join("2.jpg"));
         Ok(())
     }
 
     #[test]
     fn choose_root_thumbnail() -> Result<()> {
-        let (dir, builder) = setup()?;
-        let image_path = dir.path().join("test.jpg");
+        let f = setup(None)?;
+        let image_path = f.builder.config.input.join("test.jpg");
         File::create(&image_path)?;
-        write(dir.path().join("index.md"), "Thumbnail: doesnotexist.jpg")?;
+        write(f.builder.config.input.join("index.md"), "Thumbnail: doesnotexist.jpg")?;
 
-        let collection = builder.collect(dir.path())?.unwrap();
+        let collection = f.builder.collect(&f.builder.config.input)?.unwrap();
         assert_eq!(collection.thumbnail, image_path);
         Ok(())
     }
 
     #[test]
     fn choose_root_thumbnail_on_conflict() -> Result<()> {
-        let (dir, builder) = setup()?;
-        let image_path = dir.path().join("test.jpg");
+        let f = setup(None)?;
+        let image_path = f.builder.config.input.join("test.jpg");
         File::create(&image_path)?;
-        write(dir.path().join("index.md"), "Thumbnail: doesnotexist.jpg")?;
+        write(f.builder.config.input.join("index.md"), "Thumbnail: doesnotexist.jpg")?;
 
-        let collection = builder.collect(dir.path())?.unwrap();
+        let collection = f.builder.collect(&f.builder.config.input)?.unwrap();
         assert_eq!(collection.thumbnail, image_path);
         Ok(())
     }
 
     #[test]
     fn choose_subdir_thumbnail() -> Result<()> {
-        let (dir, builder) = setup()?;
-        let path = dir.path();
-        let subdir = path.join("a");
+        let f = setup(None)?;
+        let subdir = f.builder.config.input.join("a");
         create_dir(&subdir)?;
         let image_path = subdir.join("test.jpg");
         File::create(&image_path)?;
 
-        let collection = builder.collect(dir.path())?.unwrap();
+        let collection = f.builder.collect(&f.builder.config.input)?.unwrap();
         assert_eq!(collection.thumbnail, image_path);
         Ok(())
     }
 
     #[test]
     fn single_image_in_subdir() -> Result<()> {
-        let (dir, builder) = setup()?;
-        let path = dir.path();
-        let subdir = path.join("a");
+        let f = setup(None)?;
+        let subdir = f.builder.config.input.join("a");
         create_dir(&subdir)?;
         File::create(subdir.join("test.jpg"))?;
 
-        let collection = builder.collect(path)?;
+        let collection = f.builder.collect(&f.builder.config.input)?;
         assert!(collection.is_some());
 
         let collection = collection.unwrap();
@@ -419,13 +445,12 @@ mod tests {
 
     #[test]
     fn index_in_root_dir() -> Result<()> {
-        let (dir, builder) = setup()?;
-        let path = dir.path();
+        let f = setup(None)?;
 
-        File::create(path.join("test.jpg"))?;
+        File::create(f.builder.config.input.join("test.jpg"))?;
 
-        write(path.join("index.md"), METADATA)?;
-        let collection = builder.collect(path)?;
+        write(f.builder.config.input.join("index.md"), METADATA)?;
+        let collection = f.builder.collect(&f.builder.config.input)?;
         assert!(collection.is_some());
 
         let collection = collection.unwrap();
@@ -435,30 +460,14 @@ mod tests {
 
     #[test]
     fn process_copy() -> Result<()> {
-        let (dir, builder) = setup()?;
-        let path = dir.path();
-        let input = path.join("input");
-        let output = path.join("output");
+        let f = setup(None)?;
 
         // Copy test.jpg, which is 900x600 pixels to the root input dir.
-        create_dir(&input)?;
-        create_dir(&output)?;
-        copy("data/test.jpg", input.join("test.jpg"))?;
+        copy("data/test.jpg", f.builder.config.input.join("test.jpg"))?;
 
-        let root = builder.collect(&input)?.unwrap();
-        let config = config::Config {
-            input: input,
-            output: output.clone(),
-            thumbnail: config::Thumbnail {
-                width: 300,
-                height: 200,
-            },
-            resize: None,
-        };
-
-        builder.process(root, &config.output, &config)?;
-        let copy_name = output.join("test.jpg");
-        let thumb_name = output.join("thumbnails/test.jpg");
+        f.builder.build()?;
+        let copy_name = f.builder.config.output.join("test.jpg");
+        let thumb_name = f.builder.config.output.join("thumbnails/test.jpg");
 
         assert!(copy_name.exists());
         assert!(thumb_name.exists());
@@ -474,33 +483,13 @@ mod tests {
 
     #[test]
     fn process_resize() -> Result<()> {
-        let (dir, builder) = setup()?;
-        let path = dir.path();
-        let input = path.join("input");
-        let output = path.join("output");
-
+        let f = setup(Some((600, 400)))?;
         // Copy test.jpg, which is 900x600 pixels to the root input dir.
-        create_dir(&input)?;
-        create_dir(&output)?;
-        copy("data/test.jpg", input.join("test.jpg"))?;
+        copy("data/test.jpg", f.builder.config.input.join("test.jpg"))?;
 
-        let root = builder.collect(&input)?.unwrap();
-        let config = config::Config {
-            input: input,
-            output: output.clone(),
-            thumbnail: config::Thumbnail {
-                width: 300,
-                height: 200,
-            },
-            resize: Some(config::Resize {
-                width: 600,
-                height: 400,
-            }),
-        };
-
-        builder.process(root, &config.output, &config)?;
-        let copy_name = output.join("test.jpg");
-        let thumb_name = output.join("thumbnails/test.jpg");
+        f.builder.build()?;
+        let copy_name = f.builder.config.output.join("test.jpg");
+        let thumb_name = f.builder.config.output.join("thumbnails/test.jpg");
 
         assert!(copy_name.exists());
         assert!(thumb_name.exists());
