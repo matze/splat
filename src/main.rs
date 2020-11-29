@@ -89,7 +89,7 @@ impl Builder {
 
     fn build(&self) -> Result<()> {
         match self.collect(&self.config.input)? {
-            Some(collection) => self.process(collection, &self.config.output, &self.config),
+            Some(collection) => self.process(collection, &self.config.output),
             None => Err(anyhow!("No images found")),
         }
     }
@@ -145,21 +145,21 @@ impl Builder {
         }))
     }
 
-    fn process(&self, root: Collection, output: &Path, config: &Config) -> Result<()> {
+    fn process(&self, root: Collection, output: &Path) -> Result<()> {
         if !output.exists() {
             create_dir_all(output)?;
         }
 
         for child in root.collections {
             let output = output.join(child.path.file_name().ok_or(anyhow!("is .."))?);
-            self.process(child, &output, config)?;
+            self.process(child, &output)?;
         }
 
         let thumb_dir = output.join("thumbnails");
 
         let ops: Vec<Operation> = root.items
             .iter()
-            .map(|e| Operation::from(&e.path, output, config))
+            .map(|e| Operation::from(&e.path, output, &self.config))
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
             .filter_map(|e| e)
@@ -173,9 +173,9 @@ impl Builder {
             .map(|path| Item { path: path })
             .collect();
 
-        let thumbnail = config.output.join(
+        let thumbnail = self.config.output.join(
             root.thumbnail
-                .strip_prefix(&config.input)
+                .strip_prefix(&&self.config.input)
                 .unwrap()
                 .parent()
                 .unwrap()
