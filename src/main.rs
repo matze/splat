@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate lazy_static;
+
 mod config;
 mod metadata;
 mod process;
@@ -47,9 +50,16 @@ struct Output {
 }
 
 struct Builder {
-    extensions: HashSet<OsString>,
     templates: Option<tera::Tera>,
     config: Config,
+}
+
+lazy_static! {
+    static ref EXTENSIONS: HashSet<OsString> = {
+        let mut extensions = HashSet::new();
+        extensions.insert(OsString::from("jpg"));
+        extensions
+    };
 }
 
 impl Collection {
@@ -75,9 +85,6 @@ impl Builder {
             create_dir_all(&config.output)?;
         }
 
-        let mut extensions = HashSet::new();
-        extensions.insert(OsString::from("jpg"));
-
         let theme_path = Path::new("_theme/templates");
 
         if theme_path.exists() {
@@ -88,13 +95,11 @@ impl Builder {
             templates.autoescape_on(vec![]);
 
             Ok(Self {
-                extensions: extensions,
                 templates: Some(templates),
                 config: config,
             })
         } else {
             Ok(Self {
-                extensions: extensions,
                 templates: None,
                 config: config,
             })
@@ -129,7 +134,7 @@ impl Builder {
 
         let items: Vec<Item> = read_dir(current)?
             .filter_map(Result::ok)
-            .filter(|e| { e.path().is_file() && e.path() .extension() .map_or(false, |ext| self.extensions.contains(ext)) })
+            .filter(|e| { e.path().is_file() && e.path() .extension() .map_or(false, |ext| EXTENSIONS.contains(ext)) })
             .map(|e| Item {
                 from: e.path(),
                 to: self.config.output.join(e.path().strip_prefix(&self.config.input).unwrap())

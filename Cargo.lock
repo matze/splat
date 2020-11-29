@@ -946,6 +946,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "image",
+ "lazy_static",
  "regex",
  "serde",
  "serde_derive",
