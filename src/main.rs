@@ -115,6 +115,31 @@ fn process_operation(operation: Operation, thumb_dir: &Path) -> Result<Item> {
     }
 }
 
+fn to_operation(item: &Item, output: &Path, config: &Config) -> Result<Option<Operation>> {
+    let file_name = item.path.file_name().ok_or(anyhow!("not a file"))?;
+    let dest_path = output.join(file_name);
+
+    if !dest_path.exists() || is_older(&dest_path, &item.path)? {
+        let pair = Pair {
+            from: item.path.clone(),
+            to: dest_path,
+            thumbnail: config.thumbnail.clone(),
+        };
+
+        if let Some(target) = &config.resize {
+            return Ok(Some(Operation::Resize(Resize {
+                pair: pair,
+                width: target.width,
+                height: target.height,
+            })));
+        } else {
+            return Ok(Some(Operation::Copy(pair)));
+        }
+    }
+
+    Ok(None)
+}
+
 impl Builder {
     fn new() -> Result<Self> {
         let mut extensions = HashSet::new();
@@ -204,30 +229,13 @@ impl Builder {
 
         let thumb_dir = output.join("thumbnails");
 
-        let mut ops = Vec::new();
-
-        for item in root.items {
-            let file_name = item.path.file_name().ok_or(anyhow!("not a file"))?;
-            let dest_path = output.join(file_name);
-
-            if !dest_path.exists() || is_older(&dest_path, &item.path)? {
-                let pair = Pair {
-                    from: item.path,
-                    to: dest_path,
-                    thumbnail: config.thumbnail.clone(),
-                };
-
-                if let Some(target) = &config.resize {
-                    ops.push(Operation::Resize(Resize {
-                        pair: pair,
-                        width: target.width,
-                        height: target.height,
-                    }));
-                } else {
-                    ops.push(Operation::Copy(pair));
-                }
-            }
-        }
+        let ops: Vec<Operation> = root.items
+            .iter()
+            .map(|e| to_operation(&e, output, config))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .filter_map(|e| e)
+            .collect();
 
         let items = ops
             .into_iter()
