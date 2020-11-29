@@ -52,6 +52,19 @@ struct Builder {
     config: Config,
 }
 
+impl Collection {
+    /// Return all items from this and all sub collections.
+    fn items(&self) -> Vec<&Item> {
+        let mut items: Vec<_> = self.items.iter().collect();
+
+        for child in &self.collections {
+            items.extend(child.items());
+        }
+
+        items
+    }
+}
+
 impl Builder {
     fn new(config: Config) -> Result<Self> {
         if !config.input.exists() {
@@ -89,10 +102,20 @@ impl Builder {
     }
 
     fn build(&self) -> Result<()> {
-        match self.collect(&self.config.input, &self.config.output)? {
-            Some(collection) => self.process(collection, &self.config.output),
-            None => Err(anyhow!("No images found")),
+        let collection = self.collect(&self.config.input, &self.config.output)?;
+
+        if collection.is_none() {
+            return Err(anyhow!("No images found"));
         }
+
+        let collection = collection.unwrap();
+        let items = collection.items();
+
+        for item in &items {
+            process(&item, &self.config)?;
+        }
+
+        self.write_html(collection, &self.config.output)
     }
 
     fn collect(&self, current: &Path, output: &Path) -> Result<Option<Collection>> {
@@ -144,18 +167,14 @@ impl Builder {
         }))
     }
 
-    fn process(&self, root: Collection, output: &Path) -> Result<()> {
+    fn write_html(&self, root: Collection, output: &Path) -> Result<()> {
         if !output.exists() {
             create_dir_all(output)?;
         }
 
         for child in root.collections {
             let output = output.join(child.path.file_name().ok_or(anyhow!("is .."))?);
-            self.process(child, &output)?;
-        }
-
-        for item in &root.items {
-            process(&item, &self.config)?;
+            self.write_html(child, &output)?;
         }
 
         let thumbnail = self.config.output.join(
