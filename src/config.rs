@@ -5,7 +5,7 @@ use tokio::fs;
 
 static CONFIG_TOML: &str = ".splat.toml";
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Thumbnail {
     pub width: u32,
     pub height: u32,

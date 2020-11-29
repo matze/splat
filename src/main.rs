@@ -51,6 +51,70 @@ struct Builder {
     templates: Option<tera::Tera>,
 }
 
+struct Pair {
+    from: PathBuf,
+    to: PathBuf,
+    thumbnail: config::Thumbnail,
+}
+
+struct Resize {
+    pair: Pair,
+    width: u32,
+    height: u32,
+}
+
+enum Operation {
+    Copy(Pair),
+    Resize(Resize),
+}
+
+fn is_older(first: &Path, second: &Path) -> Result<bool> {
+    Ok(first.metadata()?.modified()? < second.metadata()?.modified()?)
+}
+
+fn generate_thumbnail(operation: &Operation, thumb_dir: &Path) -> Result<()> {
+    if !thumb_dir.exists() {
+        create_dir_all(&thumb_dir)?;
+    }
+
+    let (from, thumbnail) = match operation {
+        Operation::Copy(ref pair) => (&pair.from, &pair.thumbnail),
+        Operation::Resize(ref output) => (&output.pair.from, &output.pair.thumbnail),
+    };
+
+    let file_name = from.file_name().ok_or(anyhow!("not a file"))?;
+    let thumb_path = thumb_dir.join(file_name);
+
+    if !thumb_path.exists() || is_older(&thumb_path, from)? {
+        resize(from, &thumb_path, thumbnail.width, thumbnail.height)?;
+    }
+
+    Ok(())
+}
+
+fn process_operation(operation: Operation, thumb_dir: &Path) -> Result<Item> {
+    generate_thumbnail(&operation, thumb_dir)?;
+
+    match operation {
+        Operation::Copy(pair) => {
+            copy(&pair.from, &pair.to)?;
+            Ok(Item { path: pair.to })
+        }
+        Operation::Resize(output) => {
+            resize(
+                &output.pair.from,
+                &output.pair.to,
+                output.width,
+                output.height,
+            )?;
+
+            Ok(Item {
+                path: output.pair.to,
+            })
+        }
+    }
+}
+
 impl Builder {
     fn new() -> Result<Self> {
         let mut extensions = HashSet::new();
@@ -69,8 +133,7 @@ impl Builder {
                 extensions: extensions,
                 templates: Some(templates),
             })
-        }
-        else {
+        } else {
             Ok(Self {
                 extensions: extensions,
                 templates: None,
@@ -129,51 +192,47 @@ impl Builder {
         }))
     }
 
-    fn process(&self, root: &Collection, output: &Path, config: &Config) -> Result<()> {
+    fn process(&self, root: Collection, output: &Path, config: &Config) -> Result<()> {
         if !output.exists() {
             create_dir_all(output)?;
         }
 
-        for child in &root.collections {
+        for child in root.collections {
             let output = output.join(child.path.file_name().ok_or(anyhow!("is .."))?);
-            self.process(&child, &output, config)?;
+            self.process(child, &output, config)?;
         }
 
         let thumb_dir = output.join("thumbnails");
 
-        let mut items = Vec::new();
+        let mut ops = Vec::new();
 
-        for item in &root.items {
+        for item in root.items {
             let file_name = item.path.file_name().ok_or(anyhow!("not a file"))?;
             let dest_path = output.join(file_name);
 
             if !dest_path.exists() || is_older(&dest_path, &item.path)? {
+                let pair = Pair {
+                    from: item.path,
+                    to: dest_path,
+                    thumbnail: config.thumbnail.clone(),
+                };
+
                 if let Some(target) = &config.resize {
-                    resize(&item.path, &dest_path, target.width, target.height)?;
+                    ops.push(Operation::Resize(Resize {
+                        pair: pair,
+                        width: target.width,
+                        height: target.height,
+                    }));
                 } else {
-                    copy(&item.path, &dest_path)?;
+                    ops.push(Operation::Copy(pair));
                 }
             }
-
-            items.push(Item { path: dest_path });
-
-            // We could create the thumbnails directory outside the loop but then it might be empty in
-            // case a collection itself does not have any images.
-            if !thumb_dir.exists() {
-                create_dir_all(&thumb_dir)?;
-            }
-
-            let thumb_path = thumb_dir.join(file_name);
-
-            if !thumb_path.exists() || is_older(&thumb_path, &item.path)? {
-                resize(
-                    &item.path,
-                    &thumb_path,
-                    config.thumbnail.width,
-                    config.thumbnail.height,
-                )?;
-            }
         }
+
+        let items = ops
+            .into_iter()
+            .map(|op| process_operation(op, &thumb_dir))
+            .collect::<Result<Vec<_>, _>>()?;
 
         let thumbnail = config.output.join(
             root.thumbnail
@@ -210,10 +269,6 @@ impl Builder {
     }
 }
 
-fn is_older(first: &Path, second: &Path) -> Result<bool> {
-    Ok(first.metadata()?.modified()? < second.metadata()?.modified()?)
-}
-
 async fn build() -> Result<()> {
     let config = Config::read().await?;
     let builder = Builder::new()?;
@@ -227,7 +282,7 @@ async fn build() -> Result<()> {
     }
 
     match builder.collect(&config.input)? {
-        Some(collection) => builder.process(&collection, &config.output, &config),
+        Some(collection) => builder.process(collection, &config.output, &config),
         None => Err(anyhow!("No images found")),
     }
 }
@@ -393,7 +448,7 @@ mod tests {
             resize: None,
         };
 
-        builder.process(&root, &config.output, &config)?;
+        builder.process(root, &config.output, &config)?;
         let copy_name = output.join("test.jpg");
         let thumb_name = output.join("thumbnails/test.jpg");
 
@@ -435,7 +490,7 @@ mod tests {
             }),
         };
 
-        builder.process(&root, &config.output, &config)?;
+        builder.process(root, &config.output, &config)?;
         let copy_name = output.join("test.jpg");
         let thumb_name = output.join("thumbnails/test.jpg");
 
