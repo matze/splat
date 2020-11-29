@@ -3,9 +3,9 @@ use crate::Item;
 use anyhow::Result;
 use image::imageops;
 use image::io::Reader;
-use std::fs::{copy, create_dir_all};
 use std::path::Path;
 use tokio::task::spawn_blocking;
+use tokio::fs::{copy, create_dir_all};
 
 async fn resize(source: &Path, dest: &Path, width: u32, height: u32) -> Result<()> {
     let source = source.to_owned();
@@ -35,7 +35,7 @@ async fn generate_thumbnail(item: &Item, config: &config::Config) -> Result<()> 
         .join("thumbnails");
 
     if !thumb_dir.exists() {
-        create_dir_all(&thumb_dir)?;
+        create_dir_all(&thumb_dir).await?;
     }
 
     let thumb_path = thumb_dir.join(item.from.file_name().unwrap());
@@ -59,7 +59,7 @@ pub async fn process(item: &Item, config: &config::Config) -> Result<()> {
         if let Some(target) = &config.resize {
             resize(&item.from, &item.to, target.width, target.height).await?;
         } else {
-            copy(&item.from, &item.to)?;
+            copy(&item.from, &item.to).await?;
         }
     }
     Ok(())
