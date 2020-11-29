@@ -7,6 +7,7 @@ mod process;
 
 use anyhow::{anyhow, Result};
 use config::Config;
+use futures::future::join_all;
 use metadata::Metadata;
 use process::process;
 use serde_derive::Serialize;
@@ -63,6 +64,55 @@ lazy_static! {
 }
 
 impl Collection {
+    fn from(current: &Path, output: &Path, config: &Config) -> Result<Option<Self>> {
+        let collections: Vec<Collection> = read_dir(current)?
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path().is_dir())
+            .map(|entry| Collection::from(&entry.path(), output, config))
+            .filter_map(Result::ok)
+            .filter_map(|e| e)
+            .collect();
+
+        let items: Vec<Item> = read_dir(current)?
+            .filter_map(Result::ok)
+            .filter(|e| { e.path().is_file() && e.path() .extension() .map_or(false, |ext| EXTENSIONS.contains(ext)) })
+            .map(|e| Item {
+                from: e.path(),
+                to: config.output.join(e.path().strip_prefix(&config.input).unwrap())
+            })
+            .collect();
+
+        if items.is_empty() && collections.is_empty() {
+            return Ok(None);
+        }
+
+        let metadata = Metadata::from_path(&current)?;
+
+        // Determine thumbnail for this collection. We prioritize the one specified in the metadata
+        // over the first item in this collection over the thumbnail of the first child collection.
+        let thumbnail = metadata
+            .as_ref()
+            .map_or(None, |m| m.thumbnail.clone())
+            .or_else(|| {
+                items.first().map_or(
+                    collections
+                        .first()
+                        .map_or(None, |c| Some(c.thumbnail.clone())),
+                    |item| Some(item.from.clone()),
+                )
+            })
+            .unwrap(); // TODO: try to get rid of
+
+        Ok(Some(Collection {
+            path: current.to_owned(),
+            collections: collections,
+            items: items,
+            name: current.file_name().unwrap().to_string_lossy().to_string(),
+            metadata: metadata,
+            thumbnail: thumbnail,
+        }))
+    }
+
     /// Return all items from this and all sub collections.
     fn items(&self) -> Vec<&Item> {
         let mut items: Vec<_> = self.items.iter().collect();
@@ -106,8 +156,8 @@ impl Builder {
         }
     }
 
-    fn build(&self) -> Result<()> {
-        let collection = self.collect(&self.config.input, &self.config.output)?;
+    async fn build(&self) -> Result<()> {
+        let collection = Collection::from(&self.config.input, &self.config.output, &self.config)?;
 
         if collection.is_none() {
             return Err(anyhow!("No images found"));
@@ -116,60 +166,17 @@ impl Builder {
         let collection = collection.unwrap();
         let items = collection.items();
 
-        for item in &items {
-            process(&item, &self.config)?;
-        }
+        let futures: Vec<_> = items
+            .into_iter()
+            .map(|item| process(&item, &self.config))
+            .collect();
+
+        join_all(futures).await;
+        // for item in &items {
+        //     process(&item, &self.config)?;
+        // }
 
         self.write_html(collection, &self.config.output)
-    }
-
-    fn collect(&self, current: &Path, output: &Path) -> Result<Option<Collection>> {
-        let collections: Vec<Collection> = read_dir(current)?
-            .filter_map(Result::ok)
-            .filter(|entry| entry.path().is_dir())
-            .map(|entry| self.collect(&entry.path(), output))
-            .filter_map(Result::ok)
-            .filter_map(|e| e)
-            .collect();
-
-        let items: Vec<Item> = read_dir(current)?
-            .filter_map(Result::ok)
-            .filter(|e| { e.path().is_file() && e.path() .extension() .map_or(false, |ext| EXTENSIONS.contains(ext)) })
-            .map(|e| Item {
-                from: e.path(),
-                to: self.config.output.join(e.path().strip_prefix(&self.config.input).unwrap())
-            })
-            .collect();
-
-        if items.is_empty() && collections.is_empty() {
-            return Ok(None);
-        }
-
-        let metadata = Metadata::from_path(&current)?;
-
-        // Determine thumbnail for this collection. We prioritize the one specified in the metadata
-        // over the first item in this collection over the thumbnail of the first child collection.
-        let thumbnail = metadata
-            .as_ref()
-            .map_or(None, |m| m.thumbnail.clone())
-            .or_else(|| {
-                items.first().map_or(
-                    collections
-                        .first()
-                        .map_or(None, |c| Some(c.thumbnail.clone())),
-                    |item| Some(item.from.clone()),
-                )
-            })
-            .unwrap(); // TODO: try to get rid of
-
-        Ok(Some(Collection {
-            path: current.to_owned(),
-            collections: collections,
-            items: items,
-            name: current.file_name().unwrap().to_string_lossy().to_string(),
-            metadata: metadata,
-            thumbnail: thumbnail,
-        }))
     }
 
     fn write_html(&self, root: Collection, output: &Path) -> Result<()> {
@@ -218,7 +225,7 @@ impl Builder {
 }
 
 async fn build() -> Result<()> {
-    Builder::new(Config::read().await?)?.build()
+    Builder::new(Config::read().await?)?.build().await
 }
 
 #[tokio::main]
@@ -246,7 +253,7 @@ mod tests {
 
     impl Fixture {
         fn collect(&self) -> Result<Option<Collection>> {
-            Ok(self.builder.collect(&self.builder.config.input, &self.builder.config.output)?)
+            Ok(Collection::from(&self.builder.config.input, &self.builder.config.output, &self.builder.config)?)
         }
     }
 
@@ -388,14 +395,14 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn process_copy() -> Result<()> {
+    #[tokio::test]
+    async fn process_copy() -> Result<()> {
         let f = setup(None)?;
 
         // Copy test.jpg, which is 900x600 pixels to the root input dir.
         copy("data/test.jpg", f.builder.config.input.join("test.jpg"))?;
 
-        f.builder.build()?;
+        f.builder.build().await?;
         let copy_name = f.builder.config.output.join("test.jpg");
         let thumb_name = f.builder.config.output.join("thumbnails/test.jpg");
 
@@ -411,13 +418,13 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn process_resize() -> Result<()> {
+    #[tokio::test]
+    async fn process_resize() -> Result<()> {
         let f = setup(Some((600, 400)))?;
         // Copy test.jpg, which is 900x600 pixels to the root input dir.
         copy("data/test.jpg", f.builder.config.input.join("test.jpg"))?;
 
-        f.builder.build()?;
+        f.builder.build().await?;
         let copy_name = f.builder.config.output.join("test.jpg");
         let thumb_name = f.builder.config.output.join("thumbnails/test.jpg");
 

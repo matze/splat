@@ -5,18 +5,24 @@ use image::imageops;
 use image::io::Reader;
 use std::fs::{copy, create_dir_all};
 use std::path::Path;
+use tokio::task::spawn_blocking;
 
-fn resize(source: &Path, dest: &Path, width: u32, height: u32) -> Result<()> {
-    let image = Reader::open(&source)?.decode()?;
-    let resized = imageops::resize(&image, width, height, imageops::FilterType::Lanczos3);
-    Ok(resized.save(dest)?)
+async fn resize(source: &Path, dest: &Path, width: u32, height: u32) -> Result<()> {
+    let source = source.to_owned();
+    let dest = dest.to_owned();
+
+    spawn_blocking(move || -> Result<()> {
+        let image = Reader::open(&source)?.decode()?;
+        let resized = imageops::resize(&image, width, height, imageops::FilterType::Lanczos3);
+        Ok(resized.save(dest)?)
+    }).await?
 }
 
 fn is_older(first: &Path, second: &Path) -> Result<bool> {
     Ok(first.metadata()?.modified()? < second.metadata()?.modified()?)
 }
 
-fn generate_thumbnail(item: &Item, config: &config::Config) -> Result<()> {
+async fn generate_thumbnail(item: &Item, config: &config::Config) -> Result<()> {
     let thumb_dir = config
         .output
         .join(
@@ -40,18 +46,18 @@ fn generate_thumbnail(item: &Item, config: &config::Config) -> Result<()> {
             &thumb_path,
             config.thumbnail.width,
             config.thumbnail.height,
-        )?;
+        ).await?;
     }
 
     Ok(())
 }
 
-pub fn process(item: &Item, config: &config::Config) -> Result<()> {
-    generate_thumbnail(item, config)?;
+pub async fn process(item: &Item, config: &config::Config) -> Result<()> {
+    generate_thumbnail(item, config).await?;
 
     if !item.to.exists() || is_older(&item.to, &item.from)? {
         if let Some(target) = &config.resize {
-            resize(&item.from, &item.to, target.width, target.height)?;
+            resize(&item.from, &item.to, target.width, target.height).await?;
         } else {
             copy(&item.from, &item.to)?;
         }

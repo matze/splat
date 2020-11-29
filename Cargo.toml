@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1"
+futures = "0"
 image = "0"
 lazy_static = "1"
 regex = "1"
