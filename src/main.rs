@@ -5,7 +5,7 @@ mod process;
 use anyhow::{anyhow, Result};
 use config::Config;
 use metadata::Metadata;
-use process::{Operation, process};
+use process::process;
 use serde_derive::Serialize;
 use std::collections::HashSet;
 use std::ffi::OsString;
@@ -25,8 +25,9 @@ enum Commands {
 }
 
 #[derive(Serialize)]
-struct Item {
-    path: PathBuf,
+pub struct Item {
+    from: PathBuf,
+    to: PathBuf,
 }
 
 struct Collection {
@@ -88,37 +89,35 @@ impl Builder {
     }
 
     fn build(&self) -> Result<()> {
-        match self.collect(&self.config.input)? {
+        match self.collect(&self.config.input, &self.config.output)? {
             Some(collection) => self.process(collection, &self.config.output),
             None => Err(anyhow!("No images found")),
         }
     }
 
-    fn collect(&self, root: &Path) -> Result<Option<Collection>> {
-        let collections: Vec<Collection> = read_dir(root)?
+    fn collect(&self, current: &Path, output: &Path) -> Result<Option<Collection>> {
+        let collections: Vec<Collection> = read_dir(current)?
             .filter_map(Result::ok)
             .filter(|entry| entry.path().is_dir())
-            .map(|entry| self.collect(&entry.path()))
+            .map(|entry| self.collect(&entry.path(), output))
             .filter_map(Result::ok)
             .filter_map(|e| e)
             .collect();
 
-        let items: Vec<Item> = read_dir(root)?
+        let items: Vec<Item> = read_dir(current)?
             .filter_map(Result::ok)
-            .filter(|e| {
-                e.path().is_file()
-                    && e.path()
-                        .extension()
-                        .map_or(false, |ext| self.extensions.contains(ext))
+            .filter(|e| { e.path().is_file() && e.path() .extension() .map_or(false, |ext| self.extensions.contains(ext)) })
+            .map(|e| Item {
+                from: e.path(),
+                to: self.config.output.join(e.path().strip_prefix(&self.config.input).unwrap())
             })
-            .map(|e| Item { path: e.path() })
             .collect();
 
         if items.is_empty() && collections.is_empty() {
             return Ok(None);
         }
 
-        let metadata = Metadata::from_path(&root)?;
+        let metadata = Metadata::from_path(&current)?;
 
         // Determine thumbnail for this collection. We prioritize the one specified in the metadata
         // over the first item in this collection over the thumbnail of the first child collection.
@@ -130,16 +129,16 @@ impl Builder {
                     collections
                         .first()
                         .map_or(None, |c| Some(c.thumbnail.clone())),
-                    |item| Some(item.path.clone()),
+                    |item| Some(item.from.clone()),
                 )
             })
             .unwrap(); // TODO: try to get rid of
 
         Ok(Some(Collection {
-            path: root.to_owned(),
+            path: current.to_owned(),
             collections: collections,
             items: items,
-            name: root.file_name().unwrap().to_string_lossy().to_string(),
+            name: current.file_name().unwrap().to_string_lossy().to_string(),
             metadata: metadata,
             thumbnail: thumbnail,
         }))
@@ -155,23 +154,9 @@ impl Builder {
             self.process(child, &output)?;
         }
 
-        let thumb_dir = output.join("thumbnails");
-
-        let ops: Vec<Operation> = root.items
-            .iter()
-            .map(|e| Operation::from(&e.path, output, &self.config))
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .filter_map(|e| e)
-            .collect();
-
-        let items = ops
-            .into_iter()
-            .map(|op| process(op, &thumb_dir))
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .map(|path| Item { path: path })
-            .collect();
+        for item in &root.items {
+            process(&item, &self.config)?;
+        }
 
         let thumbnail = self.config.output.join(
             root.thumbnail
@@ -195,7 +180,7 @@ impl Builder {
                 "collection",
                 &Output {
                     title: title,
-                    items: items,
+                    items: root.items,
                     thumbnail: thumbnail,
                 },
             );
@@ -235,6 +220,12 @@ mod tests {
         _dir: TempDir,
     }
 
+    impl Fixture {
+        fn collect(&self) -> Result<Option<Collection>> {
+            Ok(self.builder.collect(&self.builder.config.input, &self.builder.config.output)?)
+        }
+    }
+
     fn setup(resize: Option<(u32, u32)>) -> Result<Fixture> {
         let dir = tempdir()?;
         let input = dir.path().join("input");
@@ -262,7 +253,7 @@ mod tests {
     #[test]
     fn empty_dir_is_none_collection() -> Result<()> {
         let f = setup(None)?;
-        let collection = f.builder.collect(&f.builder.config.input)?;
+        let collection = f.collect()?;
         assert!(collection.is_none());
         Ok(())
     }
@@ -271,7 +262,8 @@ mod tests {
     fn no_image_is_none_collection() -> Result<()> {
         let f = setup(None)?;
         File::create(f.builder.config.input.join("foo.bar"))?;
-        assert!(f.builder.collect(&f.builder.config.input)?.is_none());
+        let collection = f.collect()?;
+        assert!(collection.is_none());
         Ok(())
     }
 
@@ -279,7 +271,7 @@ mod tests {
     fn single_image_is_some_collection() -> Result<()> {
         let f = setup(None)?;
         File::create(f.builder.config.input.join("test.jpg"))?;
-        let collection = f.builder.collect(&f.builder.config.input)?;
+        let collection = f.collect()?;
         assert!(collection.is_some());
 
         let collection = collection.unwrap();
@@ -295,7 +287,7 @@ mod tests {
         File::create(&f.builder.config.input.join("3.jpg"))?;
         write(f.builder.config.input.join("index.md"), "Thumbnail: 2.jpg")?;
 
-        let collection = f.builder.collect(&f.builder.config.input)?.unwrap();
+        let collection = f.collect()?.unwrap();
         assert_eq!(collection.thumbnail, f.builder.config.input.join("2.jpg"));
         Ok(())
     }
@@ -307,7 +299,7 @@ mod tests {
         File::create(&image_path)?;
         write(f.builder.config.input.join("index.md"), "Thumbnail: doesnotexist.jpg")?;
 
-        let collection = f.builder.collect(&f.builder.config.input)?.unwrap();
+        let collection = f.collect()?.unwrap();
         assert_eq!(collection.thumbnail, image_path);
         Ok(())
     }
@@ -319,7 +311,7 @@ mod tests {
         File::create(&image_path)?;
         write(f.builder.config.input.join("index.md"), "Thumbnail: doesnotexist.jpg")?;
 
-        let collection = f.builder.collect(&f.builder.config.input)?.unwrap();
+        let collection = f.collect()?.unwrap();
         assert_eq!(collection.thumbnail, image_path);
         Ok(())
     }
@@ -332,7 +324,7 @@ mod tests {
         let image_path = subdir.join("test.jpg");
         File::create(&image_path)?;
 
-        let collection = f.builder.collect(&f.builder.config.input)?.unwrap();
+        let collection = f.collect()?.unwrap();
         assert_eq!(collection.thumbnail, image_path);
         Ok(())
     }
@@ -344,7 +336,7 @@ mod tests {
         create_dir(&subdir)?;
         File::create(subdir.join("test.jpg"))?;
 
-        let collection = f.builder.collect(&f.builder.config.input)?;
+        let collection = f.collect()?;
         assert!(collection.is_some());
 
         let collection = collection.unwrap();
@@ -364,7 +356,7 @@ mod tests {
         File::create(f.builder.config.input.join("test.jpg"))?;
 
         write(f.builder.config.input.join("index.md"), METADATA)?;
-        let collection = f.builder.collect(&f.builder.config.input)?;
+        let collection = f.collect()?;
         assert!(collection.is_some());
 
         let collection = collection.unwrap();

@@ -1,26 +1,10 @@
 use crate::config;
-use anyhow::{anyhow, Result};
+use crate::Item;
+use anyhow::Result;
 use image::imageops;
 use image::io::Reader;
 use std::fs::{copy, create_dir_all};
-use std::path::{Path, PathBuf};
-
-pub struct Pair {
-    from: PathBuf,
-    to: PathBuf,
-    thumbnail: config::Thumbnail,
-}
-
-pub struct Resize {
-    pair: Pair,
-    width: u32,
-    height: u32,
-}
-
-pub enum Operation {
-    Copy(Pair),
-    Resize(Resize),
-}
+use std::path::Path;
 
 fn resize(source: &Path, dest: &Path, width: u32, height: u32) -> Result<()> {
     let image = Reader::open(&source)?.decode()?;
@@ -32,70 +16,45 @@ fn is_older(first: &Path, second: &Path) -> Result<bool> {
     Ok(first.metadata()?.modified()? < second.metadata()?.modified()?)
 }
 
-fn generate_thumbnail(operation: &Operation, thumb_dir: &Path) -> Result<()> {
+fn generate_thumbnail(item: &Item, config: &config::Config) -> Result<()> {
+    let thumb_dir = config
+        .output
+        .join(
+            item.from
+                .parent()
+                .unwrap()
+                .strip_prefix(&config.input)
+                .unwrap(),
+        )
+        .join("thumbnails");
+
     if !thumb_dir.exists() {
         create_dir_all(&thumb_dir)?;
     }
 
-    let (from, thumbnail) = match operation {
-        Operation::Copy(ref pair) => (&pair.from, &pair.thumbnail),
-        Operation::Resize(ref output) => (&output.pair.from, &output.pair.thumbnail),
-    };
+    let thumb_path = thumb_dir.join(item.from.file_name().unwrap());
 
-    let file_name = from.file_name().ok_or(anyhow!("not a file"))?;
-    let thumb_path = thumb_dir.join(file_name);
-
-    if !thumb_path.exists() || is_older(&thumb_path, from)? {
-        resize(from, &thumb_path, thumbnail.width, thumbnail.height)?;
+    if !thumb_path.exists() || is_older(&thumb_path, &item.from)? {
+        resize(
+            &item.from,
+            &thumb_path,
+            config.thumbnail.width,
+            config.thumbnail.height,
+        )?;
     }
 
     Ok(())
 }
 
-pub fn process(operation: Operation, thumb_dir: &Path) -> Result<PathBuf> {
-    generate_thumbnail(&operation, thumb_dir)?;
+pub fn process(item: &Item, config: &config::Config) -> Result<()> {
+    generate_thumbnail(item, config)?;
 
-    match operation {
-        Operation::Copy(pair) => {
-            copy(&pair.from, &pair.to)?;
-            Ok(pair.to)
-        }
-        Operation::Resize(output) => {
-            resize(
-                &output.pair.from,
-                &output.pair.to,
-                output.width,
-                output.height,
-            )?;
-
-            Ok(output.pair.to)
+    if !item.to.exists() || is_older(&item.to, &item.from)? {
+        if let Some(target) = &config.resize {
+            resize(&item.from, &item.to, target.width, target.height)?;
+        } else {
+            copy(&item.from, &item.to)?;
         }
     }
-}
-
-impl Operation {
-    pub fn from(image_path: &Path, output: &Path, config: &config::Config) -> Result<Option<Self>> {
-        let file_name = image_path.file_name().ok_or(anyhow!("not a file"))?;
-        let dest_path = output.join(file_name);
-
-        if !dest_path.exists() || is_older(&dest_path, &image_path)? {
-            let pair = Pair {
-                from: image_path.to_owned(),
-                to: dest_path,
-                thumbnail: config.thumbnail.clone(),
-            };
-
-            if let Some(target) = &config.resize {
-                return Ok(Some(Operation::Resize(Resize {
-                    pair: pair,
-                    width: target.width,
-                    height: target.height,
-                })));
-            } else {
-                return Ok(Some(Operation::Copy(pair)));
-            }
-        }
-
-        Ok(None)
-    }
+    Ok(())
 }
