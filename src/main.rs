@@ -5,11 +5,11 @@ mod process;
 use anyhow::{anyhow, Result};
 use config::Config;
 use metadata::Metadata;
-use process::resize;
+use process::{Operation, process};
 use serde_derive::Serialize;
 use std::collections::HashSet;
 use std::ffi::OsString;
-use std::fs::{copy, create_dir_all, read_dir, write};
+use std::fs::{create_dir_all, read_dir, write};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use tera;
@@ -49,95 +49,6 @@ struct Builder {
     extensions: HashSet<OsString>,
     templates: Option<tera::Tera>,
     config: Config,
-}
-
-struct Pair {
-    from: PathBuf,
-    to: PathBuf,
-    thumbnail: config::Thumbnail,
-}
-
-struct Resize {
-    pair: Pair,
-    width: u32,
-    height: u32,
-}
-
-enum Operation {
-    Copy(Pair),
-    Resize(Resize),
-}
-
-fn is_older(first: &Path, second: &Path) -> Result<bool> {
-    Ok(first.metadata()?.modified()? < second.metadata()?.modified()?)
-}
-
-fn generate_thumbnail(operation: &Operation, thumb_dir: &Path) -> Result<()> {
-    if !thumb_dir.exists() {
-        create_dir_all(&thumb_dir)?;
-    }
-
-    let (from, thumbnail) = match operation {
-        Operation::Copy(ref pair) => (&pair.from, &pair.thumbnail),
-        Operation::Resize(ref output) => (&output.pair.from, &output.pair.thumbnail),
-    };
-
-    let file_name = from.file_name().ok_or(anyhow!("not a file"))?;
-    let thumb_path = thumb_dir.join(file_name);
-
-    if !thumb_path.exists() || is_older(&thumb_path, from)? {
-        resize(from, &thumb_path, thumbnail.width, thumbnail.height)?;
-    }
-
-    Ok(())
-}
-
-fn process_operation(operation: Operation, thumb_dir: &Path) -> Result<Item> {
-    generate_thumbnail(&operation, thumb_dir)?;
-
-    match operation {
-        Operation::Copy(pair) => {
-            copy(&pair.from, &pair.to)?;
-            Ok(Item { path: pair.to })
-        }
-        Operation::Resize(output) => {
-            resize(
-                &output.pair.from,
-                &output.pair.to,
-                output.width,
-                output.height,
-            )?;
-
-            Ok(Item {
-                path: output.pair.to,
-            })
-        }
-    }
-}
-
-fn to_operation(item: &Item, output: &Path, config: &Config) -> Result<Option<Operation>> {
-    let file_name = item.path.file_name().ok_or(anyhow!("not a file"))?;
-    let dest_path = output.join(file_name);
-
-    if !dest_path.exists() || is_older(&dest_path, &item.path)? {
-        let pair = Pair {
-            from: item.path.clone(),
-            to: dest_path,
-            thumbnail: config.thumbnail.clone(),
-        };
-
-        if let Some(target) = &config.resize {
-            return Ok(Some(Operation::Resize(Resize {
-                pair: pair,
-                width: target.width,
-                height: target.height,
-            })));
-        } else {
-            return Ok(Some(Operation::Copy(pair)));
-        }
-    }
-
-    Ok(None)
 }
 
 impl Builder {
@@ -248,7 +159,7 @@ impl Builder {
 
         let ops: Vec<Operation> = root.items
             .iter()
-            .map(|e| to_operation(&e, output, config))
+            .map(|e| Operation::from(&e.path, output, config))
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
             .filter_map(|e| e)
@@ -256,8 +167,11 @@ impl Builder {
 
         let items = ops
             .into_iter()
-            .map(|op| process_operation(op, &thumb_dir))
-            .collect::<Result<Vec<_>, _>>()?;
+            .map(|op| process(op, &thumb_dir))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .map(|path| Item { path: path })
+            .collect();
 
         let thumbnail = config.output.join(
             root.thumbnail
@@ -313,7 +227,7 @@ mod tests {
     use super::*;
     use image;
     use metadata::tests::METADATA;
-    use std::fs::{create_dir, write, File};
+    use std::fs::{copy, create_dir, write, File};
     use tempfile::{tempdir, TempDir};
 
     struct Fixture {
