@@ -29,7 +29,6 @@ enum Commands {
     New,
 }
 
-#[derive(Serialize)]
 pub struct Item {
     from: PathBuf,
     to: PathBuf,
@@ -45,9 +44,15 @@ struct Collection {
 }
 
 #[derive(Serialize)]
+struct Image {
+    path: String,
+    thumbnail: String,
+}
+
+#[derive(Serialize)]
 struct Output {
     title: String,
-    items: Vec<Item>,
+    items: Vec<Image>,
     thumbnail: PathBuf,
 }
 
@@ -62,6 +67,17 @@ lazy_static! {
         extensions.insert(OsString::from("jpg"));
         extensions
     };
+}
+
+impl Image {
+    fn from(item: &Item) -> Result<Self> {
+        let file_name = item.to.file_name().unwrap().to_string_lossy().into_owned();
+
+        Ok(Self {
+            thumbnail: format!("thumbnails/{}", &file_name),
+            path: file_name,
+        })
+    }
 }
 
 impl Collection {
@@ -181,30 +197,35 @@ impl Builder {
         Ok(())
     }
 
-    fn write_html(&self, root: Collection, templates: &tera::Tera, output: &Path) -> Result<()> {
+    fn write_html(&self, collection: Collection, templates: &tera::Tera, output: &Path) -> Result<()> {
         if !output.exists() {
             create_dir_all(output)?;
         }
 
-        for child in root.collections {
+        for child in collection.collections {
             let output = output.join(child.path.file_name().ok_or(anyhow!("is .."))?);
             self.write_html(child, templates, &output)?;
         }
 
         let thumbnail = self.config.output.join(
-            root.thumbnail
+            collection.thumbnail
                 .strip_prefix(&&self.config.input)
                 .unwrap()
                 .parent()
                 .unwrap()
                 .join("thumbnails")
-                .join(root.thumbnail.file_name().unwrap()),
+                .join(collection.thumbnail.file_name().unwrap()),
         );
 
-        let title = match &root.metadata {
+        let title = match &collection.metadata {
             Some(metadata) => metadata.title.as_ref().unwrap().clone(),
-            None => root.name.clone(),
+            None => collection.name.clone(),
         };
+
+        let items = collection.items
+            .into_iter()
+            .map(|item| Image::from(&item))
+            .collect::<Result<Vec<_>, _>>()?;
 
         let mut context = tera::Context::new();
 
@@ -212,7 +233,7 @@ impl Builder {
             "collection",
             &Output {
                 title: title,
-                items: root.items,
+                items: items,
                 thumbnail: thumbnail,
             },
         );
