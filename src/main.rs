@@ -50,10 +50,16 @@ struct Image {
 }
 
 #[derive(Serialize)]
+struct Child {
+    path: String,
+    thumbnail: String,
+}
+
+#[derive(Serialize)]
 struct Output {
     title: String,
     items: Vec<Image>,
-    thumbnail: PathBuf,
+    children: Vec<Child>,
 }
 
 struct Builder {
@@ -76,6 +82,21 @@ impl Image {
         Ok(Self {
             thumbnail: format!("thumbnails/{}", &file_name),
             path: file_name,
+        })
+    }
+}
+
+impl Child {
+    fn from(collection: &Collection) -> Result<Self> {
+        // TODO: yo, fix this mess ...
+        let dir_name = collection.path.file_name().unwrap().to_string_lossy().into_owned();
+        let thumb_dir = collection.thumbnail.strip_prefix(&collection.path.parent().unwrap())?;
+        let thumb_filename = thumb_dir.file_name().unwrap().to_string_lossy().into_owned();
+        let thumb_path = thumb_dir.parent().unwrap().join("thumbnails").join(thumb_filename).to_string_lossy().into_owned();
+
+        Ok(Self{
+            thumbnail: thumb_path,
+            path: dir_name,
         })
     }
 }
@@ -191,31 +212,21 @@ impl Builder {
         join_all(futures).await;
 
         if let Some(templates) = &self.templates {
-            self.write_html(collection, templates, &self.config.output)?;
+            self.write_html(&collection, templates, &self.config.output)?;
         }
 
         Ok(())
     }
 
-    fn write_html(&self, collection: Collection, templates: &tera::Tera, output: &Path) -> Result<()> {
+    fn write_html(&self, collection: &Collection, templates: &tera::Tera, output: &Path) -> Result<()> {
         if !output.exists() {
             create_dir_all(output)?;
         }
 
-        for child in collection.collections {
+        for child in &collection.collections {
             let output = output.join(child.path.file_name().ok_or(anyhow!("is .."))?);
             self.write_html(child, templates, &output)?;
         }
-
-        let thumbnail = self.config.output.join(
-            collection.thumbnail
-                .strip_prefix(&&self.config.input)
-                .unwrap()
-                .parent()
-                .unwrap()
-                .join("thumbnails")
-                .join(collection.thumbnail.file_name().unwrap()),
-        );
 
         let title = match &collection.metadata {
             Some(metadata) => metadata.title.as_ref().unwrap().clone(),
@@ -223,8 +234,13 @@ impl Builder {
         };
 
         let items = collection.items
-            .into_iter()
+            .iter()
             .map(|item| Image::from(&item))
+            .collect::<Result<Vec<Image>, _>>()?;
+
+        let children = collection.collections
+            .iter()
+            .map(|collection| Child::from(&collection))
             .collect::<Result<Vec<_>, _>>()?;
 
         let mut context = tera::Context::new();
@@ -234,7 +250,7 @@ impl Builder {
             &Output {
                 title: title,
                 items: items,
-                thumbnail: thumbnail,
+                children: children,
             },
         );
 
