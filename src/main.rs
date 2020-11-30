@@ -172,21 +172,22 @@ impl Builder {
             .collect();
 
         join_all(futures).await;
-        // for item in &items {
-        //     process(&item, &self.config)?;
-        // }
 
-        self.write_html(collection, &self.config.output)
+        if let Some(templates) = &self.templates {
+            self.write_html(collection, templates, &self.config.output)?;
+        }
+
+        Ok(())
     }
 
-    fn write_html(&self, root: Collection, output: &Path) -> Result<()> {
+    fn write_html(&self, root: Collection, templates: &tera::Tera, output: &Path) -> Result<()> {
         if !output.exists() {
             create_dir_all(output)?;
         }
 
         for child in root.collections {
             let output = output.join(child.path.file_name().ok_or(anyhow!("is .."))?);
-            self.write_html(child, &output)?;
+            self.write_html(child, templates, &output)?;
         }
 
         let thumbnail = self.config.output.join(
@@ -204,23 +205,19 @@ impl Builder {
             None => root.name.clone(),
         };
 
-        if let Some(templates) = &self.templates {
-            let mut context = tera::Context::new();
+        let mut context = tera::Context::new();
 
-            context.insert(
-                "collection",
-                &Output {
-                    title: title,
-                    items: root.items,
-                    thumbnail: thumbnail,
-                },
-            );
+        context.insert(
+            "collection",
+            &Output {
+                title: title,
+                items: root.items,
+                thumbnail: thumbnail,
+            },
+        );
 
-            let index_html = output.join("index.html");
-            write(index_html, templates.render("index.html", &context)?)?;
-        }
-
-        Ok(())
+        let index_html = output.join("index.html");
+        Ok(write(index_html, templates.render("index.html", &context)?)?)
     }
 }
 
