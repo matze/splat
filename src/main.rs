@@ -173,25 +173,10 @@ impl Builder {
             fs::create_dir_all(&config.output).await?;
         }
 
-        let theme_path = Path::new("_theme/templates");
-
-        if theme_path.exists() {
-            let mut templates = tera::Tera::new("_theme/templates/*.html")?;
-
-            // We disable autoescape because we will dump a lot of path-like strings which will have to
-            // be marked as "safe" by the user.
-            templates.autoescape_on(vec![]);
-
-            Ok(Self {
-                templates: Some(templates),
-                config: config,
-            })
-        } else {
-            Ok(Self {
-                templates: None,
-                config: config,
-            })
-        }
+        Ok(Self {
+            templates: config.templates()?,
+            config: config
+        })
     }
 
     async fn build(&self) -> Result<()> {
