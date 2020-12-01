@@ -18,7 +18,7 @@ async fn resize(source: &Path, dest: &Path, width: u32, height: u32) -> Result<(
     }).await?
 }
 
-fn is_older(first: &Path, second: &Path) -> Result<bool> {
+pub fn is_older(first: &Path, second: &Path) -> Result<bool> {
     Ok(first.metadata()?.modified()? < second.metadata()?.modified()?)
 }
 

@@ -70,4 +70,15 @@ impl Config {
             Ok(None)
         }
     }
+
+    pub fn static_data(&self) -> Option<PathBuf> {
+        let static_path = self.theme.join("static");
+
+        if static_path.exists() {
+            Some(static_path)
+        }
+        else {
+            None
+        }
+    }
 }
