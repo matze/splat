@@ -70,7 +70,7 @@ pub mod tests {
     fn parse_metadata() -> Result<()> {
         let metadata = from_str(&PathBuf::from("."), METADATA)?;
         assert_eq!(metadata.title.unwrap(), "foo");
-        assert_eq!(metadata.description, "Description.\n\nNext paragraph.");
+        assert_eq!(metadata.description, "<p>Description.</p>\n<p>Next paragraph.</p>\n");
         Ok(())
     }
 }
