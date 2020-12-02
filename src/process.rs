@@ -13,7 +13,7 @@ async fn resize(source: &Path, dest: &Path, width: u32, height: u32) -> Result<(
 
     spawn_blocking(move || -> Result<()> {
         let image = Reader::open(&source)?.decode()?;
-        let resized = imageops::resize(&image, width, height, imageops::FilterType::Lanczos3);
+        let resized = image.resize_to_fill(width, height, imageops::FilterType::Lanczos3);
         Ok(resized.save(dest)?)
     }).await?
 }
