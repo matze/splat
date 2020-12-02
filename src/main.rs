@@ -60,6 +60,7 @@ struct Child {
 #[derive(Serialize)]
 struct Output {
     title: String,
+    description: String,
     children: Vec<Child>,
     rows: Vec<Vec<Image>>,
 }
@@ -246,9 +247,16 @@ impl Builder {
             self.write_html(child, templates, &output)?;
         }
 
-        let title = match &collection.metadata {
-            Some(metadata) => metadata.title.as_ref().unwrap().clone(),
-            None => collection.name.clone(),
+        let (title, description) = match &collection.metadata {
+            Some(metadata) => {
+                let description = metadata.description.clone();
+
+                match &metadata.title {
+                    Some(title) => (title.as_str().to_owned(), description),
+                    None => ("".to_owned(), description),
+                }
+            },
+            None => (collection.name.clone(), "".to_owned()),
         };
 
         let items = collection.items
@@ -276,6 +284,7 @@ impl Builder {
             "collection",
             &Output {
                 title: title,
+                description: description,
                 children: children,
                 rows: rows,
             },

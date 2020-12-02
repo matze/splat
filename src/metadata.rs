@@ -1,4 +1,5 @@
 use anyhow::Result;
+use pulldown_cmark::{Parser, html};
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs::File;
@@ -28,13 +29,17 @@ fn from_str(path: &Path, content: &str) -> Result<Metadata> {
         .trim_start()
         .to_owned();
 
+    let parser = Parser::new(&description);
+    let mut html_output = String::new();
+    html::push_html(&mut html_output, parser);
+
     let thumbnail = keys
         .remove("Thumbnail")
         .map_or(None, |s| Some(path.join(PathBuf::from(s))))
         .filter(|path| path.exists());
 
     Ok(Metadata {
-        description: description,
+        description: html_output,
         title: keys.remove("Title"),
         thumbnail: thumbnail,
     })
