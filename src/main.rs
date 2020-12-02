@@ -309,6 +309,7 @@ mod tests {
         let dir = tempdir()?;
         let input = dir.path().join("input");
         let output = dir.path().join("output");
+        let theme = dir.path().join("theme");
 
         create_dir_all(&input)?;
         create_dir_all(&output)?;
@@ -316,6 +317,7 @@ mod tests {
         let config = config::Config {
             input: input,
             output: output,
+            theme: theme,
             thumbnail: config::Thumbnail {
                 width: 300,
                 height: 200,
