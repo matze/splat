@@ -267,6 +267,14 @@ impl Builder {
             },
         );
 
+        let mut static_path = PathBuf::new();
+
+        for _ in 1..output.iter().count() {
+            static_path = static_path.join("..");
+        }
+
+        context.insert("theme_url", &static_path.join("static"));
+
         let index_html = output.join("index.html");
         Ok(write(index_html, templates.render("index.html", &context)?)?)
     }
