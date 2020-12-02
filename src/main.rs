@@ -43,7 +43,7 @@ struct Collection {
     thumbnail: PathBuf,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct Image {
     path: String,
     thumbnail: String,
@@ -58,8 +58,8 @@ struct Child {
 #[derive(Serialize)]
 struct Output {
     title: String,
-    items: Vec<Image>,
     children: Vec<Child>,
+    rows: Vec<Vec<Image>>,
 }
 
 struct Builder {
@@ -256,14 +256,23 @@ impl Builder {
             .map(|collection| Child::from(&collection))
             .collect::<Result<Vec<_>, _>>()?;
 
+        let rows: Vec<Vec<Image>> = match self.config.columns {
+            Some(size) => {
+                items.chunks(size).into_iter().map(|chunk| chunk.to_vec()).collect()
+            },
+            None => {
+                items.into_iter().map(|item| vec![item]).collect()
+            }
+        };
+
         let mut context = tera::Context::new();
 
         context.insert(
             "collection",
             &Output {
                 title: title,
-                items: items,
                 children: children,
+                rows: rows,
             },
         );
 
@@ -325,6 +334,7 @@ mod tests {
         let config = config::Config {
             input: input,
             output: output,
+            columns: None,
             theme: theme,
             thumbnail: config::Thumbnail {
                 width: 300,

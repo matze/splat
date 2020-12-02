@@ -23,6 +23,7 @@ pub struct Config {
     pub input: PathBuf,
     pub output: PathBuf,
     pub theme: PathBuf,
+    pub columns: Option<usize>,
     pub thumbnail: Thumbnail,
     pub resize: Option<Resize>,
 }
@@ -33,6 +34,7 @@ impl Config {
             input: PathBuf::from("input"),
             output: PathBuf::from("_build"),
             theme: PathBuf::from("theme"),
+            columns: None,
             thumbnail: Thumbnail {
                 width: 450,
                 height: 300,
