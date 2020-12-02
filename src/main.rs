@@ -47,6 +47,8 @@ struct Collection {
 struct Image {
     path: String,
     thumbnail: String,
+    width: u32,
+    height: u32,
 }
 
 #[derive(Serialize)]
@@ -78,10 +80,13 @@ lazy_static! {
 impl Image {
     fn from(item: &Item) -> Result<Self> {
         let file_name = item.to.file_name().unwrap().to_string_lossy().into_owned();
+        let dims = image::image_dimensions(&item.to)?;
 
         Ok(Self {
             thumbnail: format!("thumbnails/{}", &file_name),
             path: file_name,
+            width: dims.0,
+            height: dims.1,
         })
     }
 }
