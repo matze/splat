@@ -3,7 +3,8 @@ use crate::Item;
 use anyhow::Result;
 use image::imageops;
 use image::io::Reader;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::fs;
 use tokio::task::spawn_blocking;
 use tokio::fs::{copy, create_dir_all};
 
@@ -63,4 +64,28 @@ pub async fn process(item: &Item, config: &config::Config) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn do_copy(path: &Path, prefix: &Path, output: &Path) -> Result<()> {
+    for item in path.read_dir()? {
+        let path = item?.path();
+        let dest = output.join(path.strip_prefix(prefix)?);
+
+        if path.is_dir() {
+            fs::create_dir_all(dest)?;
+            do_copy(&path, prefix, output)?;
+        }
+        else {
+            if !dest.exists() || is_older(&dest, &path)? {
+                fs::copy(&path, dest)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn copy_recursively(path: &PathBuf, output: &Path) -> Result<()> {
+    let prefix = &path.parent().unwrap();
+    Ok(do_copy(path, &prefix, output)?)
 }

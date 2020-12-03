@@ -9,11 +9,11 @@ use anyhow::{anyhow, Result};
 use config::Config;
 use futures::future::join_all;
 use metadata::Metadata;
-use process::{process, is_older};
+use process::{process, copy_recursively};
 use serde_derive::Serialize;
 use std::collections::HashSet;
 use std::ffi::OsString;
-use std::fs::{copy, create_dir_all, read_dir, write};
+use std::fs::{create_dir_all, read_dir, write};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use tera;
@@ -167,30 +167,6 @@ impl Collection {
 
         items
     }
-}
-
-fn do_copy(path: &Path, prefix: &Path, output: &Path) -> Result<()> {
-    for item in path.read_dir()? {
-        let path = item?.path();
-        let dest = output.join(path.strip_prefix(prefix)?);
-
-        if path.is_dir() {
-            create_dir_all(dest)?;
-            do_copy(&path, prefix, output)?;
-        }
-        else {
-            if !dest.exists() || is_older(&dest, &path)? {
-                copy(&path, dest)?;
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn copy_recursively(path: &PathBuf, output: &Path) -> Result<()> {
-    let prefix = &path.parent().unwrap();
-    Ok(do_copy(path, &prefix, output)?)
 }
 
 impl Builder {
