@@ -51,17 +51,18 @@ struct Image {
     height: u32,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct Child {
     path: String,
     thumbnail: String,
+    title: String,
 }
 
 #[derive(Serialize)]
 struct Output {
     title: String,
     description: String,
-    children: Vec<Child>,
+    children: Vec<Vec<Child>>,
     rows: Vec<Vec<Image>>,
 }
 
@@ -78,7 +79,7 @@ lazy_static! {
     };
 }
 
-fn rowify(items: Vec<Image>, num_columns: Option<usize>) -> Vec<Vec<Image>> {
+fn rowify<T: Clone>(items: Vec<T>, num_columns: Option<usize>) -> Vec<Vec<T>> {
     match num_columns {
         Some(size) => {
             items.chunks(size).into_iter().map(|chunk| chunk.to_vec()).collect()
@@ -111,9 +112,20 @@ impl Child {
         let thumb_filename = thumb_dir.file_name().unwrap().to_string_lossy().into_owned();
         let thumb_path = thumb_dir.parent().unwrap().join("thumbnails").join(thumb_filename).to_string_lossy().into_owned();
 
+        let title = match &collection.metadata {
+            Some(metadata) => {
+                match &metadata.title {
+                    Some(title) => title.clone(),
+                    None => String::new(),
+                }
+            },
+            None => String::new(),
+        };
+
         Ok(Self{
             thumbnail: thumb_path,
             path: dir_name,
+            title: title,
         })
     }
 }
@@ -249,7 +261,7 @@ impl Builder {
         let items = collection.items
             .iter()
             .map(|item| Image::from(&item))
-            .collect::<Result<Vec<Image>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         let children = collection.collections
             .iter()
@@ -263,7 +275,7 @@ impl Builder {
             &Output {
                 title: title,
                 description: description,
-                children: children,
+                children: rowify(children, self.config.columns),
                 rows: rowify(items, self.config.columns),
             },
         );
