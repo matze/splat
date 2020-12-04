@@ -78,6 +78,17 @@ lazy_static! {
     };
 }
 
+fn rowify(items: Vec<Image>, num_columns: Option<usize>) -> Vec<Vec<Image>> {
+    match num_columns {
+        Some(size) => {
+            items.chunks(size).into_iter().map(|chunk| chunk.to_vec()).collect()
+        },
+        None => {
+            items.into_iter().map(|item| vec![item]).collect()
+        }
+    }
+}
+
 impl Image {
     fn from(item: &Item) -> Result<Self> {
         let file_name = item.to.file_name().unwrap().to_string_lossy().into_owned();
@@ -245,15 +256,6 @@ impl Builder {
             .map(|collection| Child::from(&collection))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let rows: Vec<Vec<Image>> = match self.config.columns {
-            Some(size) => {
-                items.chunks(size).into_iter().map(|chunk| chunk.to_vec()).collect()
-            },
-            None => {
-                items.into_iter().map(|item| vec![item]).collect()
-            }
-        };
-
         let mut context = tera::Context::new();
 
         context.insert(
@@ -262,7 +264,7 @@ impl Builder {
                 title: title,
                 description: description,
                 children: children,
-                rows: rows,
+                rows: rowify(items, self.config.columns),
             },
         );
 
