@@ -59,9 +59,16 @@ struct Child {
 }
 
 #[derive(Serialize)]
+struct Link {
+    title: String,
+    path: String,
+}
+
+#[derive(Serialize)]
 struct Output {
     title: String,
     description: String,
+    breadcrumbs: Vec<Link>,
     children: Vec<Vec<Child>>,
     rows: Vec<Vec<Image>>,
 }
@@ -230,20 +237,25 @@ impl Builder {
         join_all(futures).await;
 
         if let Some(templates) = &self.templates {
-            self.write_html(&collection, templates, &self.config.output)?;
+            let mut breadcrumbs: Vec<String> = Vec::new();
+            self.write_html(&collection, templates, &mut breadcrumbs, &self.config.output)?;
         }
 
         Ok(())
     }
 
-    fn write_html(&self, collection: &Collection, templates: &tera::Tera, output: &Path) -> Result<()> {
+    fn write_html(&self, collection: &Collection, templates: &tera::Tera, breadcrumbs: &mut Vec<String>, output: &Path) -> Result<()> {
         if !output.exists() {
             create_dir_all(output)?;
         }
 
         for child in &collection.collections {
-            let output = output.join(child.path.file_name().ok_or(anyhow!("is .."))?);
-            self.write_html(child, templates, &output)?;
+            let subdir = child.path.file_name().unwrap();
+            let output = output.join(subdir);
+
+            breadcrumbs.push(subdir.to_string_lossy().to_string());
+            self.write_html(child, templates, breadcrumbs, &output)?;
+            breadcrumbs.remove(breadcrumbs.len() - 1);
         }
 
         let (title, description) = match &collection.metadata {
@@ -269,12 +281,20 @@ impl Builder {
             .collect::<Result<Vec<_>, _>>()?;
 
         let mut context = tera::Context::new();
+        let mut path = "..".to_owned();
+        let mut links: Vec<Link> = Vec::new();
+
+        for breadcrumb in breadcrumbs.iter().rev() {
+            links.push(Link{ title: breadcrumb.clone(), path: path.clone() });
+            path = format!("{}/..", path);
+        }
 
         context.insert(
             "collection",
             &Output {
                 title: title,
                 description: description,
+                breadcrumbs: links,
                 children: rowify(children, self.config.columns),
                 rows: rowify(items, self.config.columns),
             },
