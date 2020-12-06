@@ -56,12 +56,10 @@ async fn generate_thumbnail(item: &Item, config: &config::Config) -> Result<()> 
 pub async fn process(item: &Item, config: &config::Config) -> Result<()> {
     generate_thumbnail(item, config).await?;
 
-    if !item.to.exists() || is_older(&item.to, &item.from)? {
-        if let Some(target) = &config.resize {
-            resize(&item.from, &item.to, target.width, target.height).await?;
-        } else {
-            copy(&item.from, &item.to).await?;
-        }
+    if let Some(target) = &config.resize {
+        resize(&item.from, &item.to, target.width, target.height).await?;
+    } else {
+        copy(&item.from, &item.to).await?;
     }
     Ok(())
 }

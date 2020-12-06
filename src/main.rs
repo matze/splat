@@ -9,7 +9,7 @@ use anyhow::{anyhow, Result};
 use config::Config;
 use futures::future::join_all;
 use metadata::Metadata;
-use process::{process, copy_recursively};
+use process::{process, is_older, copy_recursively};
 use serde_derive::Serialize;
 use std::collections::HashSet;
 use std::ffi::OsString;
@@ -227,7 +227,14 @@ impl Builder {
         }
 
         let collection = collection.unwrap();
-        let items = collection.items();
+
+        let items = collection
+            .items()
+            .into_iter()
+            .filter(|item| !item.to.exists() || is_older(&item.to, &item.from).unwrap())
+            .collect::<Vec<_>>();
+
+        println!("Processing {} items ...", items.len());
 
         let futures: Vec<_> = items
             .into_iter()
