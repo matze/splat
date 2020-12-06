@@ -288,7 +288,7 @@ impl Builder {
             .collect::<Result<Vec<_>, _>>()?;
 
         let mut context = tera::Context::new();
-        let mut path = "..".to_owned();
+        let mut path = ".".to_owned();
         let mut links: Vec<Link> = Vec::new();
 
         for breadcrumb in breadcrumbs.iter().rev() {
