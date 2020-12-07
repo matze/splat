@@ -7,9 +7,9 @@ mod process;
 
 use anyhow::{anyhow, Result};
 use config::Config;
-use futures::future::join_all;
 use metadata::Metadata;
 use process::{process, is_older, copy_recursively};
+use rayon::prelude::*;
 use serde_derive::Serialize;
 use std::collections::HashSet;
 use std::ffi::OsString;
@@ -17,7 +17,6 @@ use std::fs::{create_dir_all, read_dir, write};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use tera;
-use tokio::fs;
 
 #[derive(StructOpt)]
 #[structopt(name = "splat", about = "Static photo gallery generator")]
@@ -200,13 +199,13 @@ impl Collection {
 }
 
 impl Builder {
-    async fn new(config: Config) -> Result<Self> {
+    fn new(config: Config) -> Result<Self> {
         if !config.input.exists() {
             return Err(anyhow!("{:?} does not exist", config.input));
         }
 
         if !config.output.exists() {
-            fs::create_dir_all(&config.output).await?;
+            create_dir_all(&config.output)?;
         }
 
         Ok(Self {
@@ -215,8 +214,9 @@ impl Builder {
         })
     }
 
-    async fn build(&self) -> Result<()> {
+    fn build(&self) -> Result<()> {
         if let Some(static_path) = self.config.static_data() {
+            println!("Copying static data ...");
             copy_recursively(&static_path, &self.config.output)?;
         }
 
@@ -234,16 +234,15 @@ impl Builder {
             .filter(|item| !item.to.exists() || is_older(&item.to, &item.from).unwrap())
             .collect::<Vec<_>>();
 
-        println!("Processing {} items ...", items.len());
+        println!("Processing {} images ...", items.len());
 
-        let futures: Vec<_> = items
-            .into_iter()
+        items
+            .par_iter()
             .map(|item| process(&item, &self.config))
-            .collect();
-
-        join_all(futures).await;
+            .collect::<Result<Vec<_>>>()?;
 
         if let Some(templates) = &self.templates {
+            println!("Writing HTML pages ...");
             let mut breadcrumbs: Vec<String> = Vec::new();
             self.write_html(&collection, templates, &mut breadcrumbs, &self.config.output)?;
         }
@@ -320,17 +319,16 @@ impl Builder {
     }
 }
 
-async fn build() -> Result<()> {
-    Builder::new(Config::read().await?).await?.build().await
+fn build() -> Result<()> {
+    Builder::new(Config::read()?)?.build()
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let commands = Commands::from_args();
 
     match commands {
-        Commands::Build => build().await,
-        Commands::New => Config::new().write().await,
+        Commands::Build => build(),
+        Commands::New => Config::new().write(),
     }
 }
 
@@ -353,7 +351,7 @@ mod tests {
         }
     }
 
-    async fn setup(resize: Option<(u32, u32)>) -> Result<Fixture> {
+    fn setup(resize: Option<(u32, u32)>) -> Result<Fixture> {
         let dir = tempdir()?;
         let input = dir.path().join("input");
         let output = dir.path().join("output");
@@ -375,31 +373,28 @@ mod tests {
         };
 
         Ok(Fixture {
-            builder: Builder::new(config).await?,
+            builder: Builder::new(config)?,
             _dir: dir
         })
     }
 
-    #[tokio::test]
-    async fn empty_dir_is_none_collection() -> Result<()> {
-        let f = setup(None).await?;
+    fn empty_dir_is_none_collection() -> Result<()> {
+        let f = setup(None)?;
         let collection = f.collect()?;
         assert!(collection.is_none());
         Ok(())
     }
 
-    #[tokio::test]
-    async fn no_image_is_none_collection() -> Result<()> {
-        let f = setup(None).await?;
+    fn no_image_is_none_collection() -> Result<()> {
+        let f = setup(None)?;
         File::create(f.builder.config.input.join("foo.bar"))?;
         let collection = f.collect()?;
         assert!(collection.is_none());
         Ok(())
     }
 
-    #[tokio::test]
-    async fn single_image_is_some_collection() -> Result<()> {
-        let f = setup(None).await?;
+    fn single_image_is_some_collection() -> Result<()> {
+        let f = setup(None)?;
         File::create(f.builder.config.input.join("test.jpg"))?;
         let collection = f.collect()?;
         assert!(collection.is_some());
@@ -409,9 +404,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn choose_metadata_thumbnail() -> Result<()> {
-        let f = setup(None).await?;
+    fn choose_metadata_thumbnail() -> Result<()> {
+        let f = setup(None)?;
         File::create(&f.builder.config.input.join("1.jpg"))?;
         File::create(&f.builder.config.input.join("2.jpg"))?;
         File::create(&f.builder.config.input.join("3.jpg"))?;
@@ -422,9 +416,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn choose_root_thumbnail() -> Result<()> {
-        let f = setup(None).await?;
+    fn choose_root_thumbnail() -> Result<()> {
+        let f = setup(None)?;
         let image_path = f.builder.config.input.join("test.jpg");
         File::create(&image_path)?;
         write(f.builder.config.input.join("index.md"), "Thumbnail: doesnotexist.jpg")?;
@@ -434,9 +427,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn choose_root_thumbnail_on_conflict() -> Result<()> {
-        let f = setup(None).await?;
+    fn choose_root_thumbnail_on_conflict() -> Result<()> {
+        let f = setup(None)?;
         let image_path = f.builder.config.input.join("test.jpg");
         File::create(&image_path)?;
         write(f.builder.config.input.join("index.md"), "Thumbnail: doesnotexist.jpg")?;
@@ -446,9 +438,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn choose_subdir_thumbnail() -> Result<()> {
-        let f = setup(None).await?;
+    fn choose_subdir_thumbnail() -> Result<()> {
+        let f = setup(None)?;
         let subdir = f.builder.config.input.join("a");
         create_dir(&subdir)?;
         let image_path = subdir.join("test.jpg");
@@ -459,9 +450,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn single_image_in_subdir() -> Result<()> {
-        let f = setup(None).await?;
+    fn single_image_in_subdir() -> Result<()> {
+        let f = setup(None)?;
         let subdir = f.builder.config.input.join("a");
         create_dir(&subdir)?;
         File::create(subdir.join("test.jpg"))?;
@@ -479,9 +469,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn index_in_root_dir() -> Result<()> {
-        let f = setup(None).await?;
+    fn index_in_root_dir() -> Result<()> {
+        let f = setup(None)?;
 
         File::create(f.builder.config.input.join("test.jpg"))?;
 
@@ -494,14 +483,13 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn process_copy() -> Result<()> {
-        let f = setup(None).await?;
+    fn process_copy() -> Result<()> {
+        let f = setup(None)?;
 
         // Copy test.jpg, which is 900x600 pixels to the root input dir.
         copy("data/test.jpg", f.builder.config.input.join("test.jpg"))?;
 
-        f.builder.build().await?;
+        f.builder.build()?;
         let copy_name = f.builder.config.output.join("test.jpg");
         let thumb_name = f.builder.config.output.join("thumbnails/test.jpg");
 
@@ -517,13 +505,12 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn process_resize() -> Result<()> {
-        let f = setup(Some((600, 400))).await?;
+    fn process_resize() -> Result<()> {
+        let f = setup(Some((600, 400)))?;
         // Copy test.jpg, which is 900x600 pixels to the root input dir.
         copy("data/test.jpg", f.builder.config.input.join("test.jpg"))?;
 
-        f.builder.build().await?;
+        f.builder.build()?;
         let copy_name = f.builder.config.output.join("test.jpg");
         let thumb_name = f.builder.config.output.join("thumbnails/test.jpg");
 

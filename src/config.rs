@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use serde_derive::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::fs::{read_to_string, write};
 use tera;
-use tokio::fs;
 
 static CONFIG_TOML: &str = ".splat.toml";
 
@@ -43,17 +43,16 @@ impl Config {
         }
     }
 
-    pub async fn read() -> Result<Self> {
+    pub fn read() -> Result<Self> {
         Ok(toml::from_str(
-            &fs::read_to_string(CONFIG_TOML)
-                .await
+            &read_to_string(CONFIG_TOML)
                 .context(format!("Could not open {}", CONFIG_TOML))?,
         )
         .context(format!("{} seem to be broken", CONFIG_TOML))?)
     }
 
-    pub async fn write(&self) -> Result<()> {
-        Ok(fs::write(CONFIG_TOML, toml::to_string(&self)?).await?)
+    pub fn write(&self) -> Result<()> {
+        Ok(write(CONFIG_TOML, toml::to_string(&self)?)?)
     }
 
     pub fn templates(&self) -> Result<Option<tera::Tera>> {

@@ -4,26 +4,21 @@ use anyhow::Result;
 use image::imageops;
 use image::io::Reader;
 use std::path::{Path, PathBuf};
-use std::fs;
-use tokio::task::spawn_blocking;
-use tokio::fs::{copy, create_dir_all};
+use std::fs::{create_dir_all, copy};
 
-async fn resize(source: &Path, dest: &Path, width: u32, height: u32) -> Result<()> {
+fn resize(source: &Path, dest: &Path, width: u32, height: u32) -> Result<()> {
     let source = source.to_owned();
     let dest = dest.to_owned();
-
-    spawn_blocking(move || -> Result<()> {
-        let image = Reader::open(&source)?.decode()?;
-        let resized = image.resize_to_fill(width, height, imageops::FilterType::Lanczos3);
-        Ok(resized.save(dest)?)
-    }).await?
+    let image = Reader::open(&source)?.decode()?;
+    let resized = image.resize_to_fill(width, height, imageops::FilterType::Lanczos3);
+    Ok(resized.save(dest)?)
 }
 
 pub fn is_older(first: &Path, second: &Path) -> Result<bool> {
     Ok(first.metadata()?.modified()? < second.metadata()?.modified()?)
 }
 
-async fn generate_thumbnail(item: &Item, config: &config::Config) -> Result<()> {
+fn generate_thumbnail(item: &Item, config: &config::Config) -> Result<()> {
     let thumb_dir = config
         .output
         .join(
@@ -36,7 +31,7 @@ async fn generate_thumbnail(item: &Item, config: &config::Config) -> Result<()> 
         .join("thumbnails");
 
     if !thumb_dir.exists() {
-        create_dir_all(&thumb_dir).await?;
+        create_dir_all(&thumb_dir)?;
     }
 
     let thumb_path = thumb_dir.join(item.from.file_name().unwrap());
@@ -47,20 +42,21 @@ async fn generate_thumbnail(item: &Item, config: &config::Config) -> Result<()> 
             &thumb_path,
             config.thumbnail.width,
             config.thumbnail.height,
-        ).await?;
+        )?;
     }
 
     Ok(())
 }
 
-pub async fn process(item: &Item, config: &config::Config) -> Result<()> {
-    generate_thumbnail(item, config).await?;
+pub fn process(item: &Item, config: &config::Config) -> Result<()> {
+    generate_thumbnail(item, config)?;
 
     if let Some(target) = &config.resize {
-        resize(&item.from, &item.to, target.width, target.height).await?;
+        resize(&item.from, &item.to, target.width, target.height)?;
     } else {
-        copy(&item.from, &item.to).await?;
+        copy(&item.from, &item.to)?;
     }
+
     Ok(())
 }
 
@@ -70,12 +66,12 @@ fn do_copy(path: &Path, prefix: &Path, output: &Path) -> Result<()> {
         let dest = output.join(path.strip_prefix(prefix)?);
 
         if path.is_dir() {
-            fs::create_dir_all(dest)?;
+            create_dir_all(dest)?;
             do_copy(&path, prefix, output)?;
         }
         else {
             if !dest.exists() || is_older(&dest, &path)? {
-                fs::copy(&path, dest)?;
+                copy(&path, dest)?;
             }
         }
     }

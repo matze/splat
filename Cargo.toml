@@ -6,17 +6,16 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1"
-futures = "0"
 image = "0"
 lazy_static = "1"
 pulldown-cmark = "0"
+rayon = "1"
 regex = "1"
 serde = "1"
 serde_derive = "1"
 structopt = { version = "0", default-features = false }
 tera = "1"
 toml = "0"
-tokio = { version = "0.2", features = ["full"] }
 
 [dev-dependencies]
 tempfile = "3"
