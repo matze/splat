@@ -366,6 +366,7 @@ mod tests {
         })
     }
 
+    #[test]
     fn empty_dir_is_none_collection() -> Result<()> {
         let f = setup(None)?;
         let collection = f.collect()?;
@@ -373,6 +374,7 @@ mod tests {
         Ok(())
     }
 
+    #[test]
     fn no_image_is_none_collection() -> Result<()> {
         let f = setup(None)?;
         File::create(f.builder.config.input.join("foo.bar"))?;
@@ -381,6 +383,7 @@ mod tests {
         Ok(())
     }
 
+    #[test]
     fn single_image_is_some_collection() -> Result<()> {
         let f = setup(None)?;
         File::create(f.builder.config.input.join("test.jpg"))?;
@@ -392,6 +395,7 @@ mod tests {
         Ok(())
     }
 
+    #[test]
     fn choose_metadata_thumbnail() -> Result<()> {
         let f = setup(None)?;
         File::create(&f.builder.config.input.join("1.jpg"))?;
@@ -404,6 +408,7 @@ mod tests {
         Ok(())
     }
 
+    #[test]
     fn choose_root_thumbnail() -> Result<()> {
         let f = setup(None)?;
         let image_path = f.builder.config.input.join("test.jpg");
@@ -415,6 +420,7 @@ mod tests {
         Ok(())
     }
 
+    #[test]
     fn choose_root_thumbnail_on_conflict() -> Result<()> {
         let f = setup(None)?;
         let image_path = f.builder.config.input.join("test.jpg");
@@ -426,6 +432,7 @@ mod tests {
         Ok(())
     }
 
+    #[test]
     fn choose_subdir_thumbnail() -> Result<()> {
         let f = setup(None)?;
         let subdir = f.builder.config.input.join("a");
@@ -438,6 +445,7 @@ mod tests {
         Ok(())
     }
 
+    #[test]
     fn single_image_in_subdir() -> Result<()> {
         let f = setup(None)?;
         let subdir = f.builder.config.input.join("a");
@@ -457,6 +465,7 @@ mod tests {
         Ok(())
     }
 
+    #[test]
     fn index_in_root_dir() -> Result<()> {
         let f = setup(None)?;
 
@@ -471,6 +480,7 @@ mod tests {
         Ok(())
     }
 
+    #[test]
     fn process_copy() -> Result<()> {
         let f = setup(None)?;
 
@@ -493,6 +503,7 @@ mod tests {
         Ok(())
     }
 
+    #[test]
     fn process_resize() -> Result<()> {
         let f = setup(Some((600, 400)))?;
         // Copy test.jpg, which is 900x600 pixels to the root input dir.
