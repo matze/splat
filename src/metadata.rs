@@ -51,21 +51,21 @@ fn from_str(path: &Path, content: &str) -> Result<Metadata> {
 }
 
 impl Metadata {
-    pub fn from_path(root: &Path) -> Result<Option<Metadata>> {
+    pub fn from_path(root: &Path) -> Result<Metadata> {
         let index = root.join("index.md");
 
         if !index.exists() {
-            return Ok(Some(Metadata {
+            return Ok(Metadata {
                 description: "".to_string(),
                 title: root.file_name().unwrap().to_str().unwrap().to_owned(),
                 thumbnail: None,
-            }))
+            })
         }
 
         let mut file = File::open(index)?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
-        Ok(Some(from_str(root, &contents)?))
+        Ok(from_str(root, &contents)?)
     }
 }
 

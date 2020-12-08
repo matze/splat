@@ -37,8 +37,7 @@ struct Collection {
     path: PathBuf,
     collections: Vec<Collection>,
     items: Vec<Item>,
-    name: String,
-    metadata: Option<Metadata>,
+    metadata: Metadata,
     thumbnail: PathBuf,
 }
 
@@ -64,9 +63,9 @@ struct Link {
 }
 
 #[derive(Serialize)]
-struct Output {
-    title: String,
-    description: String,
+struct Output<'a> {
+    title: &'a str,
+    description: &'a str,
     breadcrumbs: Vec<Link>,
     children: Vec<Vec<Child>>,
     rows: Vec<Vec<Image>>,
@@ -118,15 +117,10 @@ impl Child {
         let thumb_filename = thumb_dir.file_name().unwrap().to_string_lossy().into_owned();
         let thumb_path = thumb_dir.parent().unwrap().join("thumbnails").join(thumb_filename).to_string_lossy().into_owned();
 
-        let title = match &collection.metadata {
-            Some(metadata) => metadata.title.clone(),
-            None => String::new(),
-        };
-
         Ok(Self{
             thumbnail: thumb_path,
             path: dir_name,
-            title: title,
+            title: collection.metadata.title.clone(),
         })
     }
 }
@@ -158,9 +152,9 @@ impl Collection {
 
         // Determine thumbnail for this collection. We prioritize the one specified in the metadata
         // over the first item in this collection over the thumbnail of the first child collection.
-        let thumbnail = metadata
+        let thumbnail = metadata.thumbnail
             .as_ref()
-            .map_or(None, |m| m.thumbnail.clone())
+            .map_or(None, |thumbnail| Some(thumbnail.clone()))
             .or_else(|| {
                 items.first().map_or(
                     collections
@@ -175,7 +169,6 @@ impl Collection {
             path: current.to_owned(),
             collections: collections,
             items: items,
-            name: current.file_name().unwrap().to_string_lossy().to_string(),
             metadata: metadata,
             thumbnail: thumbnail,
         }))
@@ -259,11 +252,6 @@ impl Builder {
             breadcrumbs.remove(breadcrumbs.len() - 1);
         }
 
-        let (title, description) = match &collection.metadata {
-            Some(metadata) => (metadata.title.clone(), metadata.description.clone()),
-            None => (collection.name.clone(), "".to_owned()),
-        };
-
         let items = collection.items
             .iter()
             .map(|item| Image::from(&item))
@@ -286,8 +274,8 @@ impl Builder {
         context.insert(
             "collection",
             &Output {
-                title: title,
-                description: description,
+                title: &collection.metadata.title,
+                description: &collection.metadata.description,
                 breadcrumbs: links,
                 children: rowify(children, self.config.columns),
                 rows: rowify(items, self.config.columns),
@@ -476,7 +464,7 @@ mod tests {
         assert!(collection.is_some());
 
         let collection = collection.unwrap();
-        assert!(collection.metadata.is_some());
+        assert!(collection.metadata.title == "foo");
         Ok(())
     }
 
