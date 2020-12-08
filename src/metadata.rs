@@ -54,7 +54,11 @@ impl Metadata {
         let index = root.join("index.md");
 
         if !index.exists() {
-            return Ok(None);
+            return Ok(Some(Metadata {
+                description: "".to_string(),
+                title: root.file_name().unwrap().to_str().unwrap().to_owned(),
+                thumbnail: None,
+            }))
         }
 
         let mut file = File::open(index)?;
