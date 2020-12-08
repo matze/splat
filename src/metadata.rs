@@ -2,6 +2,7 @@ use anyhow::Result;
 use pulldown_cmark::{Parser, html};
 use regex::Regex;
 use std::collections::HashMap;
+use std::ffi::OsString;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -40,7 +41,7 @@ fn from_str(path: &Path, content: &str) -> Result<Metadata> {
 
     let title = keys
         .remove("Title")
-        .unwrap_or(path.file_name().unwrap().to_str().unwrap().to_owned());
+        .unwrap_or(path.file_name().unwrap_or(&OsString::new()).to_str().unwrap().to_owned());
 
     Ok(Metadata {
         description: html_output,
