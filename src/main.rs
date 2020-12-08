@@ -119,12 +119,7 @@ impl Child {
         let thumb_path = thumb_dir.parent().unwrap().join("thumbnails").join(thumb_filename).to_string_lossy().into_owned();
 
         let title = match &collection.metadata {
-            Some(metadata) => {
-                match &metadata.title {
-                    Some(title) => title.clone(),
-                    None => String::new(),
-                }
-            },
+            Some(metadata) => metadata.title.clone(),
             None => String::new(),
         };
 
@@ -265,14 +260,7 @@ impl Builder {
         }
 
         let (title, description) = match &collection.metadata {
-            Some(metadata) => {
-                let description = metadata.description.clone();
-
-                match &metadata.title {
-                    Some(title) => (title.as_str().to_owned(), description),
-                    None => ("".to_owned(), description),
-                }
-            },
+            Some(metadata) => (metadata.title.clone(), metadata.description.clone()),
             None => (collection.name.clone(), "".to_owned()),
         };
 

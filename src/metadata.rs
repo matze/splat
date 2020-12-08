@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 pub struct Metadata {
     pub description: String,
-    pub title: Option<String>,
+    pub title: String,
     pub thumbnail: Option<PathBuf>,
 }
 
@@ -38,9 +38,13 @@ fn from_str(path: &Path, content: &str) -> Result<Metadata> {
         .map_or(None, |s| Some(path.join(PathBuf::from(s))))
         .filter(|path| path.exists());
 
+    let title = keys
+        .remove("Title")
+        .unwrap_or(path.file_name().unwrap().to_str().unwrap().to_owned());
+
     Ok(Metadata {
         description: html_output,
-        title: keys.remove("Title"),
+        title: title,
         thumbnail: thumbnail,
     })
 }
@@ -69,7 +73,7 @@ pub mod tests {
     #[test]
     fn parse_metadata() -> Result<()> {
         let metadata = from_str(&PathBuf::from("."), METADATA)?;
-        assert_eq!(metadata.title.unwrap(), "foo");
+        assert_eq!(metadata.title, "foo");
         assert_eq!(metadata.description, "<p>Description.</p>\n<p>Next paragraph.</p>\n");
         Ok(())
     }
