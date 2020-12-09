@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ collection.title }}</title>
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Condensed" rel="stylesheet">
+    <link rel="stylesheet" href="{{ theme_url }}/css/normalize.css">
+    <link rel="stylesheet" href="{{ theme_url }}/css/milligram.min.css">
+    <link rel="stylesheet" href="{{ theme_url }}/css/photoswipe.css">
+    <link rel="stylesheet" href="{{ theme_url }}/css/default-skin.css">
+    <link rel="stylesheet" href="{{ theme_url }}/css/custom.css">
+    <script src="{{ theme_url }}/js/photoswipe.min.js"></script>
+    <script src="{{ theme_url }}/js/photoswipe-ui-default.min.js"></script>
+  </head>
+  <body>
+    <main class="wrapper">
+      <nav class="navigation">
+        <section class="container">
+          <ul class="navigation-list float-left">
+            <li class="navigation-item is-uppercase"><a href="/">home</a></li>
+            <li class="navigation-item">&middot;</li>
+            <li class="navigation-item is-uppercase"><a href="https://www.instagram.com/m_tzev">instagram</a></li>
+          </ul>
+        </section>
+      </nav>
+
+      <section class="container heading">
+        <header>
+          <h2 class="is-uppercase">
+            {% for breadcrumb in collection.breadcrumbs | reverse %}
+            <a href="{{ breadcrumb.path }}">{{ breadcrumb.title }}</a> {% if not loop.last %} <span
+               class="chevron-pad">›</span> {% endif %}
+            {% endfor %}
+          </h2>
+        </header>
+      </section>
+
+      <section class="container">
+        {% for row in collection.children %}
+        <div class="row image-card">
+          {% for column in row %}
+          <div class="column">
+            <div class="row">
+              <div class="column is-centered">
+                <a href="{{ column.path }}"><img src="{{ column.thumbnail }}"></a>
+              </div>
+            </div>
+            <div class="row image-card-caption">
+              <div class="column">
+                <div class="is-uppercase is-centered">{{ column.title }}</div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+
+        {% for row in collection.rows %}
+        {% set column_index = loop.index %}
+        <div class="row">
+        {% for item in row %}
+        {% set item_index = (column_index - 1) * 4 + loop.index - 1 %}
+          <div class="column">
+            <div class="clickable" onClick="onThumbnailClick({{ item_index }})"><img title="title" src="{{ item.thumbnail }}"/></div>
+          </div>
+        {% endfor %}
+        </div>
+        {% endfor %}
+
+        <div class="row">
+          <div class="column">
+          {{ collection.description }}
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <section class="container is-centered">
+          All content licensed <a rel="license" href="http://creativecommons.org/licenses/by-nd/4.0">CC BY-ND 4.0</a>
+        </section>
+      </footer>
+    </main>
+
+    <div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+      <div class="pswp__bg"></div>
+
+      <div class="pswp__scroll-wrap">
+        <div class="pswp__container">
+          <div class="pswp__item"></div>
+          <div class="pswp__item"></div>
+          <div class="pswp__item"></div>
+        </div>
+
+        <div class="pswp__ui pswp__ui--hidden">
+          <div class="pswp__top-bar">
+            <button class="pswp__button pswp__button--close" title="Close"></button>
+            <button class="pswp__button pswp__button--fs" title="Fullscreen"></button>
+            <button class="pswp__button pswp__button--zoom" title="Zoom"></button>
+
+            <div class="pswp__preloader">
+              <div class="pswp__preloader_icn">
+                <div class="pswp__preloader_cut">
+                  <div class="pswp__preloader_donut"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button class="pswp__button pswp__button--arrow--left" title="Previous"></button>
+          <button class="pswp__button pswp__button--arrow--right" title="Next"></button>
+          <div class="pswp__caption">
+            <div class="pswp__caption__center"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="text/javascript">
+      var pswpElement = document.querySelectorAll('.pswp')[0];
+
+      var items = [
+        {% for row in collection.rows %}
+        {% for item in row %}
+        {
+          msrc: '{{ item.thumbnail }}',
+          src: '{{ item.path }}',
+          orig: '{{ item.path }}',
+          w: {{ item.width }},
+          h: {{ item.height }},
+        },
+        {% endfor %}
+        {% endfor %}
+      ];
+
+      var onThumbnailClick = function(index) {
+        var options = {
+          index: index,
+          bgOpacity: 0.9,
+          shareEl: false,
+          counterEl: false,
+        };
+
+        var gallery = new PhotoSwipe(pswpElement, PhotoSwipeUI_Default, items, options);
+        gallery.init();
+
+        var button = document.querySelectorAll('.pswp__button--download')[0];
+        button.onclick = function() {
+          window.location = gallery.currItem.orig;
+        };
+      };
+    </script>
+  </body>
+</html>
