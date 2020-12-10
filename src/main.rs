@@ -107,6 +107,16 @@ fn breadcrumbs_to_links(breadcrumbs: &Vec<String>) -> Vec<Link> {
     links
 }
 
+fn output_path_to_root(output: &Path) -> PathBuf {
+    let mut path = PathBuf::new();
+
+    for _ in 1..output.iter().count() {
+        path = path.join("..");
+    }
+
+    path
+}
+
 impl Image {
     fn from(item: &Item) -> Result<Self> {
         let file_name = item.to.file_name().unwrap().to_string_lossy().into_owned();
@@ -288,12 +298,7 @@ impl Builder {
             },
         );
 
-        let mut static_path = PathBuf::new();
-
-        for _ in 1..output.iter().count() {
-            static_path = static_path.join("..");
-        }
-
+        let static_path = output_path_to_root(&output).join("static");
         context.insert("theme_url", &static_path.join("static"));
 
         let index_html = output.join("index.html");
