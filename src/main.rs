@@ -95,6 +95,18 @@ fn rowify<T: Clone>(items: Vec<T>, num_columns: Option<usize>) -> Vec<Vec<T>> {
     }
 }
 
+fn breadcrumbs_to_links(breadcrumbs: &Vec<String>) -> Vec<Link> {
+    let mut path = ".".to_owned();
+    let mut links = Vec::new();
+
+    for breadcrumb in breadcrumbs.iter().rev() {
+        links.push(Link{ title: breadcrumb.clone(), path: path.clone() });
+        path = format!("{}/..", path);
+    }
+
+    links
+}
+
 impl Image {
     fn from(item: &Item) -> Result<Self> {
         let file_name = item.to.file_name().unwrap().to_string_lossy().into_owned();
@@ -263,13 +275,7 @@ impl Builder {
             .collect::<Result<Vec<_>, _>>()?;
 
         let mut context = tera::Context::new();
-        let mut path = ".".to_owned();
-        let mut links: Vec<Link> = Vec::new();
-
-        for breadcrumb in breadcrumbs.iter().rev() {
-            links.push(Link{ title: breadcrumb.clone(), path: path.clone() });
-            path = format!("{}/..", path);
-        }
+        let links = breadcrumbs_to_links(&breadcrumbs);
 
         context.insert(
             "collection",
