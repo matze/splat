@@ -229,16 +229,16 @@ impl Builder {
             .map(|item| process(&item, &self.config))
             .collect::<Result<Vec<_>>>()?;
 
-        if let Some(templates) = &self.templates {
+        if self.templates.is_some() {
             println!("Writing HTML pages ...");
             let mut breadcrumbs: Vec<String> = Vec::new();
-            self.write_html(&collection, templates, &mut breadcrumbs, &self.config.output)?;
+            self.write_html(&collection, &mut breadcrumbs, &self.config.output)?;
         }
 
         Ok(())
     }
 
-    fn write_html(&self, collection: &Collection, templates: &tera::Tera, breadcrumbs: &mut Vec<String>, output: &Path) -> Result<()> {
+    fn write_html(&self, collection: &Collection, breadcrumbs: &mut Vec<String>, output: &Path) -> Result<()> {
         if !output.exists() {
             create_dir_all(output)?;
         }
@@ -248,7 +248,7 @@ impl Builder {
             let output = output.join(subdir);
 
             breadcrumbs.push(subdir.to_string_lossy().to_string());
-            self.write_html(child, templates, breadcrumbs, &output)?;
+            self.write_html(child, breadcrumbs, &output)?;
             breadcrumbs.remove(breadcrumbs.len() - 1);
         }
 
@@ -291,7 +291,7 @@ impl Builder {
         context.insert("theme_url", &static_path.join("static"));
 
         let index_html = output.join("index.html");
-        Ok(write(index_html, templates.render("index.html", &context)?)?)
+        Ok(write(index_html, self.templates.as_ref().unwrap().render("index.html", &context)?)?)
     }
 }
 
