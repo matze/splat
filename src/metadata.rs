@@ -1,5 +1,5 @@
 use anyhow::Result;
-use pulldown_cmark::{Parser, html};
+use pulldown_cmark::{html, Parser};
 use regex::Regex;
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -39,9 +39,13 @@ fn from_str(path: &Path, content: &str) -> Result<Metadata> {
         .map_or(None, |s| Some(path.join(PathBuf::from(s))))
         .filter(|path| path.exists());
 
-    let title = keys
-        .remove("Title")
-        .unwrap_or(path.file_name().unwrap_or(&OsString::new()).to_str().unwrap().to_owned());
+    let title = keys.remove("Title").unwrap_or(
+        path.file_name()
+            .unwrap_or(&OsString::new())
+            .to_str()
+            .unwrap()
+            .to_owned(),
+    );
 
     Ok(Metadata {
         description: html_output,
@@ -59,7 +63,7 @@ impl Metadata {
                 description: "".to_string(),
                 title: root.file_name().unwrap().to_str().unwrap().to_owned(),
                 thumbnail: None,
-            })
+            });
         }
 
         let mut file = File::open(index)?;
@@ -79,7 +83,10 @@ pub mod tests {
     fn parse_metadata() -> Result<()> {
         let metadata = from_str(&PathBuf::from("."), METADATA)?;
         assert_eq!(metadata.title, "foo");
-        assert_eq!(metadata.description, "<p>Description.</p>\n<p>Next paragraph.</p>\n");
+        assert_eq!(
+            metadata.description,
+            "<p>Description.</p>\n<p>Next paragraph.</p>\n"
+        );
         Ok(())
     }
 }

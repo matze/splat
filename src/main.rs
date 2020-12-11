@@ -8,7 +8,7 @@ mod process;
 use anyhow::{anyhow, Result};
 use config::Config;
 use metadata::Metadata;
-use process::{process, is_older, copy_recursively};
+use process::{copy_recursively, is_older, process};
 use rayon::prelude::*;
 use serde_derive::Serialize;
 use std::collections::HashSet;
@@ -88,7 +88,8 @@ fn rowify<T: Clone>(items: Vec<T>, num_columns: usize) -> Vec<Vec<T>> {
     items
         .chunks(num_columns)
         .into_iter()
-        .map(|chunk| chunk.to_vec()).collect()
+        .map(|chunk| chunk.to_vec())
+        .collect()
 }
 
 fn breadcrumbs_to_links(breadcrumbs: &Vec<String>) -> Vec<Link> {
@@ -96,7 +97,10 @@ fn breadcrumbs_to_links(breadcrumbs: &Vec<String>) -> Vec<Link> {
     let mut links = Vec::new();
 
     for breadcrumb in breadcrumbs.iter().rev() {
-        links.push(Link{ title: breadcrumb.clone(), path: path.clone() });
+        links.push(Link {
+            title: breadcrumb.clone(),
+            path: path.clone(),
+        });
         path = format!("{}/..", path);
     }
 
@@ -130,12 +134,29 @@ impl Image {
 impl Child {
     fn from(collection: &Collection) -> Result<Self> {
         // TODO: yo, fix this mess ...
-        let dir_name = collection.path.file_name().unwrap().to_string_lossy().into_owned();
-        let thumb_dir = collection.thumbnail.strip_prefix(&collection.path.parent().unwrap())?;
-        let thumb_filename = thumb_dir.file_name().unwrap().to_string_lossy().into_owned();
-        let thumb_path = thumb_dir.parent().unwrap().join("thumbnails").join(thumb_filename).to_string_lossy().into_owned();
+        let dir_name = collection
+            .path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        let thumb_dir = collection
+            .thumbnail
+            .strip_prefix(&collection.path.parent().unwrap())?;
+        let thumb_filename = thumb_dir
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        let thumb_path = thumb_dir
+            .parent()
+            .unwrap()
+            .join("thumbnails")
+            .join(thumb_filename)
+            .to_string_lossy()
+            .into_owned();
 
-        Ok(Self{
+        Ok(Self {
             thumbnail: thumb_path,
             path: dir_name,
             title: collection.metadata.title.clone(),
@@ -155,10 +176,17 @@ impl Collection {
 
         let items: Vec<Item> = read_dir(current)?
             .filter_map(Result::ok)
-            .filter(|e| { e.path().is_file() && e.path() .extension() .map_or(false, |ext| EXTENSIONS.contains(ext)) })
+            .filter(|e| {
+                e.path().is_file()
+                    && e.path()
+                        .extension()
+                        .map_or(false, |ext| EXTENSIONS.contains(ext))
+            })
             .map(|e| Item {
                 from: e.path(),
-                to: config.output.join(e.path().strip_prefix(&config.input).unwrap())
+                to: config
+                    .output
+                    .join(e.path().strip_prefix(&config.input).unwrap()),
             })
             .collect();
 
@@ -170,7 +198,8 @@ impl Collection {
 
         // Determine thumbnail for this collection. We prioritize the one specified in the metadata
         // over the first item in this collection over the thumbnail of the first child collection.
-        let thumbnail = metadata.thumbnail
+        let thumbnail = metadata
+            .thumbnail
             .as_ref()
             .map_or(None, |thumbnail| Some(thumbnail.clone()))
             .or_else(|| {
@@ -216,7 +245,7 @@ impl Builder {
 
         Ok(Self {
             templates: config.templates()?,
-            config: config
+            config: config,
         })
     }
 
@@ -256,7 +285,12 @@ impl Builder {
         Ok(())
     }
 
-    fn write_html(&self, collection: &Collection, breadcrumbs: &mut Vec<String>, output: &Path) -> Result<()> {
+    fn write_html(
+        &self,
+        collection: &Collection,
+        breadcrumbs: &mut Vec<String>,
+        output: &Path,
+    ) -> Result<()> {
         if !output.exists() {
             create_dir_all(output)?;
         }
@@ -270,12 +304,14 @@ impl Builder {
             breadcrumbs.remove(breadcrumbs.len() - 1);
         }
 
-        let items = collection.items
+        let items = collection
+            .items
             .iter()
             .map(|item| Image::from(&item))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let mut children = collection.collections
+        let mut children = collection
+            .collections
             .iter()
             .map(|collection| Child::from(&collection))
             .collect::<Result<Vec<_>, _>>()?;
@@ -300,7 +336,13 @@ impl Builder {
         context.insert("theme_url", &static_path);
 
         let index_html = output.join("index.html");
-        Ok(write(index_html, self.templates.as_ref().unwrap().render("index.html", &context)?)?)
+        Ok(write(
+            index_html,
+            self.templates
+                .as_ref()
+                .unwrap()
+                .render("index.html", &context)?,
+        )?)
     }
 }
 
@@ -332,7 +374,11 @@ mod tests {
 
     impl Fixture {
         fn collect(&self) -> Result<Option<Collection>> {
-            Ok(Collection::from(&self.builder.config.input, &self.builder.config.output, &self.builder.config)?)
+            Ok(Collection::from(
+                &self.builder.config.input,
+                &self.builder.config.output,
+                &self.builder.config,
+            )?)
         }
     }
 
@@ -357,12 +403,17 @@ mod tests {
                 width: 300,
                 height: 200,
             },
-            resize: resize.and_then(|r| Some(config::Resize {width: r.0, height: r.1})),
+            resize: resize.and_then(|r| {
+                Some(config::Resize {
+                    width: r.0,
+                    height: r.1,
+                })
+            }),
         };
 
         Ok(Fixture {
             builder: Builder::new(config)?,
-            _dir: dir
+            _dir: dir,
         })
     }
 
@@ -413,7 +464,10 @@ mod tests {
         let f = setup(None)?;
         let image_path = f.builder.config.input.join("test.jpg");
         File::create(&image_path)?;
-        write(f.builder.config.input.join("index.md"), "Thumbnail: doesnotexist.jpg")?;
+        write(
+            f.builder.config.input.join("index.md"),
+            "Thumbnail: doesnotexist.jpg",
+        )?;
 
         let collection = f.collect()?.unwrap();
         assert_eq!(collection.thumbnail, image_path);
@@ -425,7 +479,10 @@ mod tests {
         let f = setup(None)?;
         let image_path = f.builder.config.input.join("test.jpg");
         File::create(&image_path)?;
-        write(f.builder.config.input.join("index.md"), "Thumbnail: doesnotexist.jpg")?;
+        write(
+            f.builder.config.input.join("index.md"),
+            "Thumbnail: doesnotexist.jpg",
+        )?;
 
         let collection = f.collect()?.unwrap();
         assert_eq!(collection.thumbnail, image_path);

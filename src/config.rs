@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use serde_derive::{Deserialize, Serialize};
-use std::path::PathBuf;
 use std::fs::{read_to_string, write};
+use std::path::PathBuf;
 use tera;
 
 static CONFIG_TOML: &str = ".splat.toml";
@@ -54,8 +54,7 @@ impl Config {
 
     pub fn read() -> Result<Self> {
         Ok(toml::from_str(
-            &read_to_string(CONFIG_TOML)
-                .context(format!("Could not open {}", CONFIG_TOML))?,
+            &read_to_string(CONFIG_TOML).context(format!("Could not open {}", CONFIG_TOML))?,
         )
         .context(format!("{} seem to be broken", CONFIG_TOML))?)
     }
@@ -86,8 +85,7 @@ impl Config {
 
         if static_path.exists() {
             Some(static_path)
-        }
-        else {
+        } else {
             None
         }
     }

@@ -3,8 +3,8 @@ use crate::Item;
 use anyhow::Result;
 use image::imageops;
 use image::io::Reader;
+use std::fs::{copy, create_dir_all};
 use std::path::{Path, PathBuf};
-use std::fs::{create_dir_all, copy};
 
 fn resize(source: &Path, dest: &Path, width: u32, height: u32) -> Result<()> {
     let source = source.to_owned();
@@ -68,8 +68,7 @@ fn do_copy(path: &Path, prefix: &Path, output: &Path) -> Result<()> {
         if path.is_dir() {
             create_dir_all(dest)?;
             do_copy(&path, prefix, output)?;
-        }
-        else {
+        } else {
             if !dest.exists() || is_older(&dest, &path)? {
                 copy(&path, dest)?;
             }
