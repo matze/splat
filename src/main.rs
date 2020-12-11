@@ -295,8 +295,8 @@ impl Builder {
                 title: &collection.metadata.title,
                 description: &collection.metadata.description,
                 breadcrumbs: links,
-                children: rowify(children, self.config.columns),
-                rows: rowify(items, self.config.columns),
+                children: rowify(children, self.config.theme.collection_columns),
+                rows: rowify(items, self.config.theme.image_columns),
             },
         );
 
@@ -352,8 +352,11 @@ mod tests {
         let config = config::Config {
             input: input,
             output: output,
-            columns: None,
-            theme: theme,
+            theme: config::Theme {
+                path: theme,
+                image_columns: None,
+                collection_columns: None,
+            },
             thumbnail: config::Thumbnail {
                 width: 300,
                 height: 200,

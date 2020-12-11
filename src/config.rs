@@ -19,11 +19,17 @@ pub struct Resize {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct Theme {
+    pub path: PathBuf,
+    pub image_columns: Option<usize>,
+    pub collection_columns: Option<usize>,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct Config {
     pub input: PathBuf,
     pub output: PathBuf,
-    pub theme: PathBuf,
-    pub columns: Option<usize>,
+    pub theme: Theme,
     pub thumbnail: Thumbnail,
     pub resize: Option<Resize>,
 }
@@ -33,8 +39,11 @@ impl Config {
         Config {
             input: PathBuf::from("input"),
             output: PathBuf::from("_build"),
-            theme: PathBuf::from("theme"),
-            columns: None,
+            theme: Theme {
+                path: PathBuf::from("theme"),
+                image_columns: None,
+                collection_columns: None,
+            },
             thumbnail: Thumbnail {
                 width: 450,
                 height: 300,
@@ -56,7 +65,7 @@ impl Config {
     }
 
     pub fn templates(&self) -> Result<Option<tera::Tera>> {
-        let theme_path = &self.theme.join("templates");
+        let theme_path = &self.theme.path.join("templates");
 
         if theme_path.exists() {
             let mut templates =
@@ -73,7 +82,7 @@ impl Config {
     }
 
     pub fn static_data(&self) -> Option<PathBuf> {
-        let static_path = self.theme.join("static");
+        let static_path = self.theme.path.join("static");
 
         if static_path.exists() {
             Some(static_path)
