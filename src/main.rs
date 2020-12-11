@@ -279,10 +279,12 @@ impl Builder {
             .map(|item| Image::from(&item))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let children = collection.collections
+        let mut children = collection.collections
             .iter()
             .map(|collection| Child::from(&collection))
             .collect::<Result<Vec<_>, _>>()?;
+
+        children.sort_by(|a, b| b.title.cmp(&a.title));
 
         let mut context = tera::Context::new();
         let links = breadcrumbs_to_links(&breadcrumbs);
