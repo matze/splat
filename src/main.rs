@@ -299,7 +299,7 @@ impl Builder {
         );
 
         let static_path = output_path_to_root(&output).join("static");
-        context.insert("theme_url", &static_path.join("static"));
+        context.insert("theme_url", &static_path);
 
         let index_html = output.join("index.html");
         Ok(write(index_html, self.templates.as_ref().unwrap().render("index.html", &context)?)?)
