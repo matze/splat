@@ -21,8 +21,8 @@ pub struct Resize {
 #[derive(Serialize, Deserialize)]
 pub struct Theme {
     pub path: PathBuf,
-    pub image_columns: Option<usize>,
-    pub collection_columns: Option<usize>,
+    pub image_columns: usize,
+    pub collection_columns: usize,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -41,8 +41,8 @@ impl Config {
             output: PathBuf::from("_build"),
             theme: Theme {
                 path: PathBuf::from("theme"),
-                image_columns: None,
-                collection_columns: None,
+                image_columns: 4,
+                collection_columns: 3,
             },
             thumbnail: Thumbnail {
                 width: 450,

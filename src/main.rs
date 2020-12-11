@@ -84,15 +84,11 @@ lazy_static! {
     };
 }
 
-fn rowify<T: Clone>(items: Vec<T>, num_columns: Option<usize>) -> Vec<Vec<T>> {
-    match num_columns {
-        Some(size) => {
-            items.chunks(size).into_iter().map(|chunk| chunk.to_vec()).collect()
-        },
-        None => {
-            items.into_iter().map(|item| vec![item]).collect()
-        }
-    }
+fn rowify<T: Clone>(items: Vec<T>, num_columns: usize) -> Vec<Vec<T>> {
+    items
+        .chunks(num_columns)
+        .into_iter()
+        .map(|chunk| chunk.to_vec()).collect()
 }
 
 fn breadcrumbs_to_links(breadcrumbs: &Vec<String>) -> Vec<Link> {
@@ -354,8 +350,8 @@ mod tests {
             output: output,
             theme: config::Theme {
                 path: theme,
-                image_columns: None,
-                collection_columns: None,
+                image_columns: 4,
+                collection_columns: 3,
             },
             thumbnail: config::Thumbnail {
                 width: 300,
