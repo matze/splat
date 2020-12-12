@@ -8,13 +8,16 @@ mod process;
 use anyhow::{anyhow, Result};
 use config::Config;
 use metadata::Metadata;
-use process::{copy_recursively, is_older, process};
+use process::{copy_recursively, is_older, process, Process};
 use rayon::prelude::*;
 use serde_derive::Serialize;
 use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fs::{create_dir_all, read_dir, write};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::channel;
+use std::thread;
 use structopt::StructOpt;
 use tera;
 
@@ -251,8 +254,9 @@ impl Builder {
 
     fn build(&self) -> Result<()> {
         if let Some(static_path) = self.config.static_data() {
-            println!("Copying static data ...");
+            print!("[ ] copying static data ...");
             copy_recursively(&static_path, &self.config.output)?;
+            println!("\x1B[2K\r[✔] copied static data");
         }
 
         let collection = Collection::from(&self.config.input, &self.config.output, &self.config)?;
@@ -269,17 +273,47 @@ impl Builder {
             .filter(|item| !item.to.exists() || is_older(&item.to, &item.from).unwrap())
             .collect::<Vec<_>>();
 
-        println!("Processing {} images ...", items.len());
+        let num_items = items.len();
+        let (sender, receiver) = channel::<Result<()>>();
 
-        items
-            .par_iter()
-            .map(|item| process(&item, &self.config))
-            .collect::<Result<Vec<_>>>()?;
+        let processes = items
+            .into_iter()
+            .map(|item| Process {
+                config: &self.config,
+                item: &item,
+                sender: sender.clone(),
+            })
+            .collect::<Vec<_>>();
+
+        thread::spawn(move || {
+            let spinners = vec!["⠖", "⠲", "⠴", "⠦"];
+            let num_spinners = spinners.len();
+
+            for i in 0..num_items {
+                let result = receiver.recv();
+
+                if result.is_err() {
+                    println!("\rError: {:?}", result);
+                } else {
+                    print!(
+                        "\x1B[2K\r[{}] {} images remaining ...",
+                        spinners[i % num_spinners],
+                        num_items - i
+                    );
+                    io::stdout().flush().unwrap();
+                }
+            }
+
+            println!("\x1B[2K\r[✔] processed {} images", num_items);
+        });
+
+        processes.into_par_iter().for_each(|p| process(p));
 
         if self.templates.is_some() {
-            println!("Writing HTML pages ...");
+            print!("[ ] writing HTML pages ...");
             let mut breadcrumbs: Vec<String> = Vec::new();
             self.write_html(&collection, &mut breadcrumbs, &self.config.output)?;
+            println!("\x1B[2K\r[✔] wrote HTML pages");
         }
 
         Ok(())
