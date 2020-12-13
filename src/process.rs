@@ -27,12 +27,13 @@ pub fn is_older(first: &Path, second: &Path) -> Result<bool> {
 
 fn generate_thumbnail(p: &Process) -> Result<()> {
     let thumb_dir = p.config
+        .toml
         .output
         .join(
             p.item.from
                 .parent()
                 .unwrap()
-                .strip_prefix(&p.config.input)
+                .strip_prefix(&p.config.toml.input)
                 .unwrap(),
         )
         .join("thumbnails");
@@ -47,8 +48,8 @@ fn generate_thumbnail(p: &Process) -> Result<()> {
         resize(
             &p.item.from,
             &thumb_path,
-            p.config.thumbnail.width,
-            p.config.thumbnail.height,
+            p.config.toml.thumbnail.width,
+            p.config.toml.thumbnail.height,
         )?;
     }
 
@@ -63,7 +64,7 @@ pub fn process(p: Process) {
         return;
     }
 
-    let result = match &p.config.resize {
+    let result = match &p.config.toml.resize {
         Some(target) => {
             resize(&p.item.from, &p.item.to, target.width, target.height)
         },

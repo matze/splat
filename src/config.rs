@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use serde_derive::{Deserialize, Serialize};
 use std::fs::{read_to_string, write};
 use std::path::PathBuf;
-use tera;
+use tera::Tera;
 
 static CONFIG_TOML: &str = ".splat.toml";
 
@@ -26,7 +26,7 @@ pub struct Theme {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Config {
+pub struct TomlConfig {
     pub input: PathBuf,
     pub output: PathBuf,
     pub theme: Theme,
@@ -34,9 +34,15 @@ pub struct Config {
     pub resize: Option<Resize>,
 }
 
+pub struct Config {
+    pub toml: TomlConfig,
+    pub templates: Tera,
+    pub static_path: Option<PathBuf>,
+}
+
 impl Config {
-    pub fn new() -> Self {
-        Config {
+    pub fn new() -> Result<Self> {
+        Config::from(TomlConfig {
             input: PathBuf::from("input"),
             output: PathBuf::from("_build"),
             theme: Theme {
@@ -49,44 +55,40 @@ impl Config {
                 height: 300,
             },
             resize: None,
-        }
+        })
+    }
+
+    pub fn from(toml: TomlConfig) -> Result<Self> {
+        let theme_path = toml.theme.path.join("templates");
+        let mut templates =
+            tera::Tera::new(&theme_path.join("*.html").to_string_lossy().into_owned())
+                .context(format!("Could not load templates from {:?}", theme_path))?;
+
+        templates.autoescape_on(vec![]);
+
+        let static_path = toml.theme.path.join("static");
+
+        Ok(Config {
+            toml: toml,
+            templates: templates,
+            static_path: if static_path.exists() {
+                Some(static_path)
+            } else {
+                None
+            },
+        })
     }
 
     pub fn read() -> Result<Self> {
-        Ok(toml::from_str(
+        let toml: TomlConfig = toml::from_str(
             &read_to_string(CONFIG_TOML).context(format!("Could not open {}", CONFIG_TOML))?,
         )
-        .context(format!("{} seem to be broken", CONFIG_TOML))?)
+        .context(format!("{} seem to be broken", CONFIG_TOML))?;
+
+        Config::from(toml)
     }
 
     pub fn write(&self) -> Result<()> {
-        Ok(write(CONFIG_TOML, toml::to_string(&self)?)?)
-    }
-
-    pub fn templates(&self) -> Result<Option<tera::Tera>> {
-        let theme_path = &self.theme.path.join("templates");
-
-        if theme_path.exists() {
-            let mut templates =
-                tera::Tera::new(&theme_path.join("*.html").to_string_lossy().into_owned())?;
-
-            // We disable autoescape because we will dump a lot of path-like strings which will have to
-            // be marked as "safe" by the user.
-            templates.autoescape_on(vec![]);
-
-            Ok(Some(templates))
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub fn static_data(&self) -> Option<PathBuf> {
-        let static_path = self.theme.path.join("static");
-
-        if static_path.exists() {
-            Some(static_path)
-        } else {
-            None
-        }
+        Ok(write(CONFIG_TOML, toml::to_string(&self.toml)?)?)
     }
 }

@@ -75,7 +75,6 @@ struct Output<'a> {
 }
 
 struct Builder {
-    templates: Option<tera::Tera>,
     config: Config,
 }
 
@@ -188,8 +187,8 @@ impl Collection {
             .map(|e| Item {
                 from: e.path(),
                 to: config
-                    .output
-                    .join(e.path().strip_prefix(&config.input).unwrap()),
+                    .toml.output
+                    .join(e.path().strip_prefix(&config.toml.input).unwrap()),
             })
             .collect();
 
@@ -238,28 +237,25 @@ impl Collection {
 
 impl Builder {
     fn new(config: Config) -> Result<Self> {
-        if !config.input.exists() {
-            return Err(anyhow!("{:?} does not exist", config.input));
+        if !config.toml.input.exists() {
+            return Err(anyhow!("{:?} does not exist", config.toml.input));
         }
 
-        if !config.output.exists() {
-            create_dir_all(&config.output)?;
+        if !config.toml.output.exists() {
+            create_dir_all(&config.toml.output)?;
         }
 
-        Ok(Self {
-            templates: config.templates()?,
-            config: config,
-        })
+        Ok(Self { config: config })
     }
 
     fn build(&self) -> Result<()> {
-        if let Some(static_path) = self.config.static_data() {
+        if let Some(static_path) = self.config.static_path.as_ref() {
             print!("[ ] copying static data ...");
-            copy_recursively(&static_path, &self.config.output)?;
+            copy_recursively(&static_path, &self.config.toml.output)?;
             println!("\x1B[2K\r[✔] copied static data");
         }
 
-        let collection = Collection::from(&self.config.input, &self.config.output, &self.config)?;
+        let collection = Collection::from(&self.config.toml.input, &self.config.toml.output, &self.config)?;
 
         if collection.is_none() {
             return Err(anyhow!("No images found"));
@@ -309,12 +305,10 @@ impl Builder {
 
         processes.into_par_iter().for_each(|p| process(p));
 
-        if self.templates.is_some() {
-            print!("[ ] writing HTML pages ...");
-            let mut breadcrumbs: Vec<String> = Vec::new();
-            self.write_html(&collection, &mut breadcrumbs, &self.config.output)?;
-            println!("\x1B[2K\r[✔] wrote HTML pages");
-        }
+        print!("[ ] writing HTML pages ...");
+        let mut breadcrumbs: Vec<String> = Vec::new();
+        self.write_html(&collection, &mut breadcrumbs, &self.config.toml.output)?;
+        println!("\x1B[2K\r[✔] wrote HTML pages");
 
         Ok(())
     }
@@ -361,8 +355,8 @@ impl Builder {
                 title: &collection.metadata.title,
                 description: &collection.metadata.description,
                 breadcrumbs: links,
-                children: rowify(children, self.config.theme.collection_columns),
-                rows: rowify(items, self.config.theme.image_columns),
+                children: rowify(children, self.config.toml.theme.collection_columns),
+                rows: rowify(items, self.config.toml.theme.image_columns),
             },
         );
 
@@ -370,12 +364,10 @@ impl Builder {
         context.insert("theme_url", &static_path);
 
         let index_html = output.join("index.html");
+
         Ok(write(
             index_html,
-            self.templates
-                .as_ref()
-                .unwrap()
-                .render("index.html", &context)?,
+            self.config.templates.render("index.html", &context)?,
         )?)
     }
 }
@@ -389,7 +381,7 @@ fn main() -> Result<()> {
 
     match commands {
         Commands::Build => build(),
-        Commands::New => Config::new().write(),
+        Commands::New => Config::new()?.write(),
     }
 }
 
@@ -398,7 +390,7 @@ mod tests {
     use super::*;
     use image;
     use metadata::tests::METADATA;
-    use std::fs::{copy, create_dir, write, File};
+    use std::fs::{copy, create_dir, create_dir_all, write, File};
     use tempfile::{tempdir, TempDir};
 
     struct Fixture {
@@ -409,8 +401,8 @@ mod tests {
     impl Fixture {
         fn collect(&self) -> Result<Option<Collection>> {
             Ok(Collection::from(
-                &self.builder.config.input,
-                &self.builder.config.output,
+                &self.builder.config.toml.input,
+                &self.builder.config.toml.output,
                 &self.builder.config,
             )?)
         }
@@ -421,11 +413,14 @@ mod tests {
         let input = dir.path().join("input");
         let output = dir.path().join("output");
         let theme = dir.path().join("theme");
+        let template_dir = theme.join("templates");
 
         create_dir_all(&input)?;
         create_dir_all(&output)?;
+        create_dir_all(&template_dir)?;
+        File::create(template_dir.join("index.html"))?;
 
-        let config = config::Config {
+        let config = config::TomlConfig {
             input: input,
             output: output,
             theme: config::Theme {
@@ -446,7 +441,7 @@ mod tests {
         };
 
         Ok(Fixture {
-            builder: Builder::new(config)?,
+            builder: Builder::new(Config::from(config)?)?,
             _dir: dir,
         })
     }
@@ -462,7 +457,7 @@ mod tests {
     #[test]
     fn no_image_is_none_collection() -> Result<()> {
         let f = setup(None)?;
-        File::create(f.builder.config.input.join("foo.bar"))?;
+        File::create(f.builder.config.toml.input.join("foo.bar"))?;
         let collection = f.collect()?;
         assert!(collection.is_none());
         Ok(())
@@ -471,7 +466,7 @@ mod tests {
     #[test]
     fn single_image_is_some_collection() -> Result<()> {
         let f = setup(None)?;
-        File::create(f.builder.config.input.join("test.jpg"))?;
+        File::create(f.builder.config.toml.input.join("test.jpg"))?;
         let collection = f.collect()?;
         assert!(collection.is_some());
 
@@ -483,23 +478,23 @@ mod tests {
     #[test]
     fn choose_metadata_thumbnail() -> Result<()> {
         let f = setup(None)?;
-        File::create(&f.builder.config.input.join("1.jpg"))?;
-        File::create(&f.builder.config.input.join("2.jpg"))?;
-        File::create(&f.builder.config.input.join("3.jpg"))?;
-        write(f.builder.config.input.join("index.md"), "Thumbnail: 2.jpg")?;
+        File::create(&f.builder.config.toml.input.join("1.jpg"))?;
+        File::create(&f.builder.config.toml.input.join("2.jpg"))?;
+        File::create(&f.builder.config.toml.input.join("3.jpg"))?;
+        write(f.builder.config.toml.input.join("index.md"), "Thumbnail: 2.jpg")?;
 
         let collection = f.collect()?.unwrap();
-        assert_eq!(collection.thumbnail, f.builder.config.input.join("2.jpg"));
+        assert_eq!(collection.thumbnail, f.builder.config.toml.input.join("2.jpg"));
         Ok(())
     }
 
     #[test]
     fn choose_root_thumbnail() -> Result<()> {
         let f = setup(None)?;
-        let image_path = f.builder.config.input.join("test.jpg");
+        let image_path = f.builder.config.toml.input.join("test.jpg");
         File::create(&image_path)?;
         write(
-            f.builder.config.input.join("index.md"),
+            f.builder.config.toml.input.join("index.md"),
             "Thumbnail: doesnotexist.jpg",
         )?;
 
@@ -511,10 +506,10 @@ mod tests {
     #[test]
     fn choose_root_thumbnail_on_conflict() -> Result<()> {
         let f = setup(None)?;
-        let image_path = f.builder.config.input.join("test.jpg");
+        let image_path = f.builder.config.toml.input.join("test.jpg");
         File::create(&image_path)?;
         write(
-            f.builder.config.input.join("index.md"),
+            f.builder.config.toml.input.join("index.md"),
             "Thumbnail: doesnotexist.jpg",
         )?;
 
@@ -526,7 +521,7 @@ mod tests {
     #[test]
     fn choose_subdir_thumbnail() -> Result<()> {
         let f = setup(None)?;
-        let subdir = f.builder.config.input.join("a");
+        let subdir = f.builder.config.toml.input.join("a");
         create_dir(&subdir)?;
         let image_path = subdir.join("test.jpg");
         File::create(&image_path)?;
@@ -539,7 +534,7 @@ mod tests {
     #[test]
     fn single_image_in_subdir() -> Result<()> {
         let f = setup(None)?;
-        let subdir = f.builder.config.input.join("a");
+        let subdir = f.builder.config.toml.input.join("a");
         create_dir(&subdir)?;
         File::create(subdir.join("test.jpg"))?;
 
@@ -560,9 +555,9 @@ mod tests {
     fn index_in_root_dir() -> Result<()> {
         let f = setup(None)?;
 
-        File::create(f.builder.config.input.join("test.jpg"))?;
+        File::create(f.builder.config.toml.input.join("test.jpg"))?;
 
-        write(f.builder.config.input.join("index.md"), METADATA)?;
+        write(f.builder.config.toml.input.join("index.md"), METADATA)?;
         let collection = f.collect()?;
         assert!(collection.is_some());
 
@@ -576,11 +571,11 @@ mod tests {
         let f = setup(None)?;
 
         // Copy test.jpg, which is 900x600 pixels to the root input dir.
-        copy("data/test.jpg", f.builder.config.input.join("test.jpg"))?;
+        copy("data/test.jpg", f.builder.config.toml.input.join("test.jpg"))?;
 
         f.builder.build()?;
-        let copy_name = f.builder.config.output.join("test.jpg");
-        let thumb_name = f.builder.config.output.join("thumbnails/test.jpg");
+        let copy_name = f.builder.config.toml.output.join("test.jpg");
+        let thumb_name = f.builder.config.toml.output.join("thumbnails/test.jpg");
 
         assert!(copy_name.exists());
         assert!(thumb_name.exists());
@@ -598,11 +593,11 @@ mod tests {
     fn process_resize() -> Result<()> {
         let f = setup(Some((600, 400)))?;
         // Copy test.jpg, which is 900x600 pixels to the root input dir.
-        copy("data/test.jpg", f.builder.config.input.join("test.jpg"))?;
+        copy("data/test.jpg", f.builder.config.toml.input.join("test.jpg"))?;
 
         f.builder.build()?;
-        let copy_name = f.builder.config.output.join("test.jpg");
-        let thumb_name = f.builder.config.output.join("thumbnails/test.jpg");
+        let copy_name = f.builder.config.toml.output.join("test.jpg");
+        let thumb_name = f.builder.config.toml.output.join("thumbnails/test.jpg");
 
         assert!(copy_name.exists());
         assert!(thumb_name.exists());
