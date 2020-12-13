@@ -251,9 +251,9 @@ impl Builder {
 
     fn build(&self) -> Result<()> {
         if let Some(static_path) = self.config.static_path.as_ref() {
-            print!("[ ] copying static data ...");
+            print!("  Copying static data ...");
             copy_recursively(&static_path, &self.config.toml.output)?;
-            println!("\x1B[2K\r[✔] copied static data");
+            println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m Copied static data");
         }
 
         let collection = Collection::from(
@@ -297,7 +297,7 @@ impl Builder {
                     println!("\rError: {:?}", result);
                 } else {
                     print!(
-                        "\x1B[2K\r[{}] {} images remaining ...",
+                        "\x1B[2K\r\x1B[0;36m{}\x1B[0;m Processing {} images ...",
                         spinners[i % num_spinners],
                         num_items - i
                     );
@@ -305,15 +305,15 @@ impl Builder {
                 }
             }
 
-            println!("\x1B[2K\r[✔] processed {} images", num_items);
+            println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m Processed {} images", num_items);
         });
 
         processes.into_par_iter().for_each(|p| process(p));
 
-        print!("[ ] writing HTML pages ...");
+        print!("  Writing HTML pages ...");
         let mut breadcrumbs: Vec<String> = Vec::new();
         self.write_html(&collection, &mut breadcrumbs, &self.config.toml.output)?;
-        println!("\x1B[2K\r[✔] wrote HTML pages");
+        println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m Wrote HTML pages");
 
         Ok(())
     }
