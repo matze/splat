@@ -53,10 +53,10 @@ struct Image {
 }
 
 #[derive(Clone, Serialize)]
-struct Child {
+struct Child<'a> {
     path: String,
     thumbnail: String,
-    title: String,
+    title: &'a str,
 }
 
 #[derive(Serialize)]
@@ -70,7 +70,7 @@ struct Output<'a> {
     title: &'a str,
     description: &'a str,
     breadcrumbs: Vec<Link>,
-    children: Vec<Vec<Child>>,
+    children: Vec<Vec<Child<'a>>>,
     rows: Vec<Vec<Image>>,
 }
 
@@ -133,8 +133,8 @@ impl Image {
     }
 }
 
-impl Child {
-    fn from(collection: &Collection) -> Result<Self> {
+impl<'a> Child<'a> {
+    fn from(collection: &'a Collection) -> Result<Self> {
         // TODO: yo, fix this mess ...
         let dir_name = collection
             .path
@@ -161,7 +161,7 @@ impl Child {
         Ok(Self {
             thumbnail: thumb_path,
             path: dir_name,
-            title: collection.metadata.title.clone(),
+            title: &collection.metadata.title,
         })
     }
 }
@@ -187,7 +187,8 @@ impl Collection {
             .map(|e| Item {
                 from: e.path(),
                 to: config
-                    .toml.output
+                    .toml
+                    .output
                     .join(e.path().strip_prefix(&config.toml.input).unwrap()),
             })
             .collect();
@@ -255,7 +256,11 @@ impl Builder {
             println!("\x1B[2K\r[✔] copied static data");
         }
 
-        let collection = Collection::from(&self.config.toml.input, &self.config.toml.output, &self.config)?;
+        let collection = Collection::from(
+            &self.config.toml.input,
+            &self.config.toml.output,
+            &self.config,
+        )?;
 
         if collection.is_none() {
             return Err(anyhow!("No images found"));
@@ -481,10 +486,16 @@ mod tests {
         File::create(&f.builder.config.toml.input.join("1.jpg"))?;
         File::create(&f.builder.config.toml.input.join("2.jpg"))?;
         File::create(&f.builder.config.toml.input.join("3.jpg"))?;
-        write(f.builder.config.toml.input.join("index.md"), "Thumbnail: 2.jpg")?;
+        write(
+            f.builder.config.toml.input.join("index.md"),
+            "Thumbnail: 2.jpg",
+        )?;
 
         let collection = f.collect()?.unwrap();
-        assert_eq!(collection.thumbnail, f.builder.config.toml.input.join("2.jpg"));
+        assert_eq!(
+            collection.thumbnail,
+            f.builder.config.toml.input.join("2.jpg")
+        );
         Ok(())
     }
 
@@ -571,7 +582,10 @@ mod tests {
         let f = setup(None)?;
 
         // Copy test.jpg, which is 900x600 pixels to the root input dir.
-        copy("data/test.jpg", f.builder.config.toml.input.join("test.jpg"))?;
+        copy(
+            "data/test.jpg",
+            f.builder.config.toml.input.join("test.jpg"),
+        )?;
 
         f.builder.build()?;
         let copy_name = f.builder.config.toml.output.join("test.jpg");
@@ -593,7 +607,10 @@ mod tests {
     fn process_resize() -> Result<()> {
         let f = setup(Some((600, 400)))?;
         // Copy test.jpg, which is 900x600 pixels to the root input dir.
-        copy("data/test.jpg", f.builder.config.toml.input.join("test.jpg"))?;
+        copy(
+            "data/test.jpg",
+            f.builder.config.toml.input.join("test.jpg"),
+        )?;
 
         f.builder.build()?;
         let copy_name = f.builder.config.toml.output.join("test.jpg");
