@@ -15,20 +15,25 @@ pub struct Metadata {
 
 fn from_str(path: &Path, content: &str) -> Result<Metadata> {
     let re = Regex::new(r"([[:alpha:]]+): (.+)")?;
-    let mut lines = content.lines();
+    let lines = content.lines();
+    let mut matching_phase = true;
+    let mut keys: HashMap<String, String> = HashMap::new();
+    let mut description = String::new();
 
-    let mut keys = lines
-        .by_ref()
-        .take_while(|&v| re.is_match(v))
-        .filter_map(|v| re.captures(v))
-        .map(|caps| (caps[1].to_string(), caps[2].to_string()))
-        .collect::<HashMap<_, _>>();
+    for line in lines {
+        if matching_phase {
+            if re.is_match(&line) {
+                let caps = re.captures(&line).unwrap();
+                keys.insert(caps[1].to_string(), caps[2].to_string());
+                continue;
+            } else {
+                matching_phase = false;
+            }
+        }
 
-    let description = lines
-        .skip_while(|&line| line == "\n")
-        .fold(String::new(), |a, b| a + "\n" + b)
-        .trim_start()
-        .to_owned();
+        description.push_str(&line);
+        description.push('\n');
+    }
 
     let parser = Parser::new(&description);
     let mut html_output = String::new();
@@ -87,6 +92,14 @@ pub mod tests {
             metadata.description,
             "<p>Description.</p>\n<p>Next paragraph.</p>\n"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn no_metadata_is_description() -> Result<()> {
+        let metadata = from_str(&PathBuf::from("."), "This is *bold*.")?;
+        assert_eq!(metadata.title, "");
+        assert_eq!(metadata.description, "<p>This is <em>bold</em>.</p>\n");
         Ok(())
     }
 }
