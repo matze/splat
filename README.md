@@ -2,6 +2,8 @@
 
 A simple [sigal](https://github.com/saimn/sigal) clone written in Rust.
 
+<a href="https://matze.github.io/splat/"><img alt="Example output" src="https://i.imgur.com/EHyhrRw.jpg"/></a>
+
 ### Usage
 
 splat is a command line application and uses various sub commands. First, create
