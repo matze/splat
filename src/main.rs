@@ -46,9 +46,9 @@ struct Collection {
 }
 
 #[derive(Clone, Serialize)]
-struct Image {
+struct Image<'a> {
     path: String,
-    thumbnail: String,
+    thumbnail: &'a Path,
     width: u32,
     height: u32,
 }
@@ -72,7 +72,7 @@ struct Output<'a> {
     description: &'a str,
     breadcrumbs: Vec<Link>,
     children: Vec<Vec<Child<'a>>>,
-    rows: Vec<Vec<Image>>,
+    rows: Vec<Vec<Image<'a>>>,
 }
 
 struct Builder {
@@ -120,13 +120,13 @@ fn output_path_to_root(output: &Path) -> PathBuf {
     path
 }
 
-impl Image {
-    fn from(item: &Item) -> Result<Self> {
+impl<'a> Image<'a> {
+    fn from(item: &'a Item) -> Result<Self> {
         let file_name = item.to.file_name().unwrap().to_string_lossy().into_owned();
         let dims = image::image_dimensions(&item.to)?;
 
         Ok(Self {
-            thumbnail: format!("thumbnails/{}", &file_name),
+            thumbnail: &item.thumbnail,
             path: file_name,
             width: dims.0,
             height: dims.1,
