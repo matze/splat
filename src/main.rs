@@ -34,6 +34,7 @@ enum Commands {
 pub struct Item {
     from: PathBuf,
     to: PathBuf,
+    thumbnail: PathBuf,
 }
 
 struct Collection {
@@ -135,17 +136,24 @@ impl Image {
 
 impl Item {
     fn from(path: PathBuf, config: &Config) -> Result<Self> {
+        let to = config
+            .toml
+            .output
+            .join(&path.strip_prefix(&config.toml.input)?);
+
         Ok(Self {
-            to: config
-                .toml
-                .output
-                .join(&path.strip_prefix(&config.toml.input)?),
+            thumbnail: to
+                .parent()
+                .unwrap()
+                .join("thumbnails")
+                .join(path.file_name().unwrap()),
+            to: to,
             from: path,
         })
     }
 
     fn needs_update(&self) -> bool {
-        !self.to.exists() || is_older(&self.to, &self.from).unwrap()
+        !self.to.exists() || is_older(&self.to, &self.from).unwrap() || !self.thumbnail.exists()
     }
 }
 
