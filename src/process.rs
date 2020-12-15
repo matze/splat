@@ -1,6 +1,6 @@
 use crate::config;
 use crate::Item;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use image::imageops;
 use image::io::Reader;
 use std::fs::{copy, create_dir_all};
@@ -70,15 +70,9 @@ pub fn process(p: Process) {
 
     let result = match &p.config.toml.resize {
         Some(target) => resize(&p.item.from, &p.item.to, target.width, target.height),
-        None => match copy(&p.item.from, &p.item.to) {
-            Err(e) => Err(anyhow!(
-                "Copying {:?} => {:?} failed: {}",
-                p.item.from,
-                p.item.to,
-                e
-            )),
-            Ok(_) => Ok(()),
-        },
+        None => copy(&p.item.from, &p.item.to)
+            .context(format!("Copying {:?} => {:?}", p.item.from, p.item.to))
+            .map(|_| ()),
     };
 
     p.sender.send(result).unwrap();
