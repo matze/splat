@@ -134,6 +134,16 @@ impl Image {
 }
 
 impl Item {
+    fn from(path: PathBuf, config: &Config) -> Result<Self> {
+        Ok(Self {
+            to: config
+                .toml
+                .output
+                .join(&path.strip_prefix(&config.toml.input)?),
+            from: path,
+        })
+    }
+
     fn needs_update(&self) -> bool {
         !self.to.exists() || is_older(&self.to, &self.from).unwrap()
     }
@@ -190,14 +200,8 @@ impl Collection {
                         .extension()
                         .map_or(false, |ext| EXTENSIONS.contains(ext))
             })
-            .map(|e| Item {
-                from: e.path(),
-                to: config
-                    .toml
-                    .output
-                    .join(e.path().strip_prefix(&config.toml.input).unwrap()),
-            })
-            .collect();
+            .map(|e| Item::from(e.path(), &config))
+            .collect::<Result<Vec<_>>>()?;
 
         if items.is_empty() && collections.is_empty() {
             return Ok(None);
@@ -311,7 +315,10 @@ impl Builder {
                 }
             }
 
-            println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m Processed {} images", num_items);
+            println!(
+                "\x1B[2K\r\x1B[0;32m✔\x1B[0;m Processed {} images",
+                num_items
+            );
         });
 
         processes.into_par_iter().for_each(|p| process(p));
