@@ -1,5 +1,7 @@
 ## splat
 
+![Rust](https://github.com/matze/splat/workflows/Rust/badge.svg)
+
 A simple [sigal](https://github.com/saimn/sigal) clone written in Rust.
 
 <a href="https://matze.github.io/splat/"><img alt="Example output" src="https://i.imgur.com/EHyhrRw.jpg"/></a>
