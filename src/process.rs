@@ -1,6 +1,6 @@
 use crate::config;
 use crate::Item;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use image::imageops;
 use image::io::Reader;
 use std::fs::{copy, create_dir_all};
@@ -16,7 +16,9 @@ pub struct Process<'a> {
 fn resize(source: &Path, dest: &Path, width: u32, height: u32) -> Result<()> {
     let source = source.to_owned();
     let dest = dest.to_owned();
-    let image = Reader::open(&source)?.decode()?;
+    let image = Reader::open(&source)?
+        .decode()
+        .context(format!("{:?} does not seem to be a valid image", source))?;
     let resized = image.resize_to_fill(width, height, imageops::FilterType::Lanczos3);
     Ok(resized.save(dest)?)
 }
@@ -26,11 +28,13 @@ pub fn is_older(first: &Path, second: &Path) -> Result<bool> {
 }
 
 fn generate_thumbnail(p: &Process) -> Result<()> {
-    let thumb_dir = p.config
+    let thumb_dir = p
+        .config
         .toml
         .output
         .join(
-            p.item.from
+            p.item
+                .from
                 .parent()
                 .unwrap()
                 .strip_prefix(&p.config.toml.input)
@@ -65,13 +69,16 @@ pub fn process(p: Process) {
     }
 
     let result = match &p.config.toml.resize {
-        Some(target) => {
-            resize(&p.item.from, &p.item.to, target.width, target.height)
-        },
+        Some(target) => resize(&p.item.from, &p.item.to, target.width, target.height),
         None => match copy(&p.item.from, &p.item.to) {
-            Err(e) => Err(anyhow!("Copying {:?} => {:?} failed: {}", p.item.from, p.item.to, e)),
-            Ok(_) => Ok(())
-        }
+            Err(e) => Err(anyhow!(
+                "Copying {:?} => {:?} failed: {}",
+                p.item.from,
+                p.item.to,
+                e
+            )),
+            Ok(_) => Ok(()),
+        },
     };
 
     p.sender.send(result).unwrap();

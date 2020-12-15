@@ -314,12 +314,11 @@ impl Builder {
                     spinners[i % num_spinners],
                     num_items - i
                 );
+
                 io::stdout().flush().unwrap();
 
-                let result = receiver.recv();
-
-                if result.is_err() {
-                    println!("\rError: {:?}", result);
+                if let Err(result) = receiver.recv().unwrap() {
+                    println!("\x1B[2K\r\x1B[0;31mE\x1B[0;m {}", result);
                 }
             }
 
@@ -411,7 +410,7 @@ fn main() {
     };
 
     if let Err(err) = result {
-        println!("\x1B[2K\r\x1B[0;31m! {}\x1B[0;m", err);
+        println!("\x1B[2K\r\x1B[0;31mE\x1B[0;m {}", err);
     }
 }
 
