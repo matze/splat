@@ -381,12 +381,16 @@ fn build() -> Result<()> {
     Builder::new(Config::read()?)?.build()
 }
 
-fn main() -> Result<()> {
+fn main() {
     let commands = Commands::from_args();
 
-    match commands {
+    let result = match commands {
         Commands::Build => build(),
-        Commands::New => Config::new()?.write(),
+        Commands::New => Config::new().and_then(|config| config.write()),
+    };
+
+    if let Err(err) = result {
+        println!("\x1B[2K\r\x1B[0;31m! {}\x1B[0;m", err);
     }
 }
 
