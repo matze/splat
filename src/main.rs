@@ -291,17 +291,17 @@ impl Builder {
             let num_spinners = spinners.len();
 
             for i in 0..num_items {
+                print!(
+                    "\x1B[2K\r\x1B[0;36m{}\x1B[0;m Processing {} images ...",
+                    spinners[i % num_spinners],
+                    num_items - i
+                );
+                io::stdout().flush().unwrap();
+
                 let result = receiver.recv();
 
                 if result.is_err() {
                     println!("\rError: {:?}", result);
-                } else {
-                    print!(
-                        "\x1B[2K\r\x1B[0;36m{}\x1B[0;m Processing {} images ...",
-                        spinners[i % num_spinners],
-                        num_items - i
-                    );
-                    io::stdout().flush().unwrap();
                 }
             }
 
