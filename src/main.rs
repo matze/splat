@@ -133,6 +133,12 @@ impl Image {
     }
 }
 
+impl Item {
+    fn needs_update(&self) -> bool {
+        !self.to.exists() || is_older(&self.to, &self.from).unwrap()
+    }
+}
+
 impl<'a> Child<'a> {
     fn from(collection: &'a Collection) -> Result<Self> {
         // TODO: yo, fix this mess ...
@@ -271,7 +277,7 @@ impl Builder {
         let items = collection
             .items()
             .into_iter()
-            .filter(|item| !item.to.exists() || is_older(&item.to, &item.from).unwrap())
+            .filter(|item| item.needs_update())
             .collect::<Vec<_>>();
 
         let num_items = items.len();
