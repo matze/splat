@@ -28,30 +28,18 @@ pub fn is_older(first: &Path, second: &Path) -> Result<bool> {
 }
 
 fn generate_thumbnail(p: &Process) -> Result<()> {
-    let thumb_dir = p
-        .config
-        .toml
-        .output
-        .join(
-            p.item
-                .from
-                .parent()
-                .unwrap()
-                .strip_prefix(&p.config.toml.input)
-                .unwrap(),
-        )
-        .join("thumbnails");
+    let thumb_dir = p.item.thumbnail.parent();
 
-    if !thumb_dir.exists() {
-        create_dir_all(&thumb_dir)?;
+    if let Some(dir) = thumb_dir {
+        if !dir.exists() {
+            create_dir_all(dir)?;
+        }
     }
 
-    let thumb_path = thumb_dir.join(p.item.from.file_name().unwrap());
-
-    if !thumb_path.exists() || is_older(&thumb_path, &p.item.from)? {
+    if !p.item.thumbnail.exists() || is_older(&p.item.thumbnail, &p.item.from)? {
         resize(
             &p.item.from,
-            &thumb_path,
+            &p.item.thumbnail,
             p.config.toml.thumbnail.width,
             p.config.toml.thumbnail.height,
         )?;
