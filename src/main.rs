@@ -55,8 +55,8 @@ struct Image<'a> {
 
 #[derive(Clone, Serialize)]
 struct Child<'a> {
-    path: String,
-    thumbnail: String,
+    path: &'a Path,
+    thumbnail: PathBuf,
     title: &'a str,
 }
 
@@ -159,32 +159,27 @@ impl Item {
 
 impl<'a> Child<'a> {
     fn from(collection: &'a Collection) -> Result<Self> {
-        // TODO: yo, fix this mess ...
-        let dir_name = collection
+        let path = collection
             .path
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .into_owned();
-        let thumb_dir = collection
-            .thumbnail
-            .strip_prefix(&collection.path.parent().unwrap())?;
-        let thumb_filename = thumb_dir
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .into_owned();
-        let thumb_path = thumb_dir
             .parent()
-            .unwrap()
+            .ok_or(anyhow!("{:?} has no parent", collection.path))?;
+
+        let filename = collection
+            .thumbnail
+            .file_name()
+            .ok_or(anyhow!("{:?} has no filename", collection.thumbnail))?;
+
+        let thumbnail = collection
+            .thumbnail
+            .strip_prefix(path)?
+            .parent()
+            .ok_or(anyhow!("{:?} has no parent", collection.thumbnail))?
             .join("thumbnails")
-            .join(thumb_filename)
-            .to_string_lossy()
-            .into_owned();
+            .join(filename);
 
         Ok(Self {
-            thumbnail: thumb_path,
-            path: dir_name,
+            thumbnail: thumbnail,
+            path: path,
             title: &collection.metadata.title,
         })
     }
