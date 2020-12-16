@@ -280,11 +280,7 @@ impl Builder {
             &self.config,
         )?;
 
-        if collection.is_none() {
-            return Err(anyhow!("No images found"));
-        }
-
-        let collection = collection.unwrap();
+        let collection = collection.ok_or(anyhow!("No images found"))?;
 
         let items = collection
             .items()
