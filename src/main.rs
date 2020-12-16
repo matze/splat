@@ -47,7 +47,7 @@ struct Collection {
 
 #[derive(Clone, Serialize)]
 struct Image<'a> {
-    path: String,
+    path: &'a str,
     thumbnail: &'a Path,
     width: u32,
     height: u32,
@@ -61,8 +61,8 @@ struct Child<'a> {
 }
 
 #[derive(Serialize)]
-struct Link {
-    title: String,
+struct Link<'a> {
+    title: &'a str,
     path: String,
 }
 
@@ -70,7 +70,7 @@ struct Link {
 struct Output<'a> {
     title: &'a str,
     description: &'a str,
-    breadcrumbs: Vec<Link>,
+    breadcrumbs: Vec<Link<'a>>,
     children: Vec<Vec<Child<'a>>>,
     rows: Vec<Vec<Image<'a>>>,
 }
@@ -101,7 +101,7 @@ fn breadcrumbs_to_links(breadcrumbs: &Vec<String>) -> Vec<Link> {
 
     for breadcrumb in breadcrumbs.iter().rev() {
         links.push(Link {
-            title: breadcrumb.clone(),
+            title: &breadcrumb,
             path: path.clone(),
         });
         path = format!("{}/..", path);
@@ -122,12 +122,18 @@ fn output_path_to_root(output: &Path) -> PathBuf {
 
 impl<'a> Image<'a> {
     fn from(item: &'a Item) -> Result<Self> {
-        let file_name = item.to.file_name().unwrap().to_string_lossy().into_owned();
         let dims = image::image_dimensions(&item.to)?;
+
+        let path = item
+            .to
+            .file_name()
+            .ok_or(anyhow!("{:?} is not a file", item.to))?
+            .to_str()
+            .ok_or(anyhow!("Failed to stringify {:?}", item.to))?;
 
         Ok(Self {
             thumbnail: &item.thumbnail,
-            path: file_name,
+            path: path,
             width: dims.0,
             height: dims.1,
         })
