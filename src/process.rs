@@ -48,26 +48,25 @@ fn generate_thumbnail(p: &Process) -> Result<()> {
     Ok(())
 }
 
+fn wrapped_process(p: &Process) -> Result<()> {
+    generate_thumbnail(p)?;
+
+    if p.item.to.exists() && is_older(&p.item.to, &p.item.from)? {
+        return Ok(());
+    }
+
+    match &p.config.toml.resize {
+        Some(target) => resize(&p.item.from, &p.item.to, target.width, target.height),
+        None => copy(&p.item.from, &p.item.to)
+            .context(format!("Copying {:?} => {:?}", p.item.from, p.item.to))
+            .map(|_| ()),
+    }?;
+
+    Ok(())
+}
+
 pub fn process(p: Process) {
-    let result = generate_thumbnail(&p);
-
-    if result.is_err() {
-        p.sender.send(result).unwrap();
-        return;
-    }
-
-    if !p.item.to.exists() || is_older(&p.item.to, &p.item.from).unwrap() {
-        let result = match &p.config.toml.resize {
-            Some(target) => resize(&p.item.from, &p.item.to, target.width, target.height),
-            None => copy(&p.item.from, &p.item.to)
-                .context(format!("Copying {:?} => {:?}", p.item.from, p.item.to))
-                .map(|_| ()),
-        };
-
-        p.sender.send(result).unwrap();
-    }
-
-    p.sender.send(Ok(())).unwrap();
+    p.sender.send(wrapped_process(&p)).unwrap();
 }
 
 fn do_copy(path: &Path, prefix: &Path, output: &Path) -> Result<()> {
