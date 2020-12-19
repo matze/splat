@@ -367,11 +367,13 @@ impl Builder {
             breadcrumbs.remove(breadcrumbs.len() - 1);
         }
 
-        let items = collection
+        let mut images = collection
             .items
             .iter()
             .map(|item| Image::from(&item))
             .collect::<Result<Vec<_>, _>>()?;
+
+        images.sort_by(|a, b| a.thumbnail.cmp(&b.thumbnail));
 
         let mut children = collection
             .collections
@@ -391,7 +393,7 @@ impl Builder {
                 description: &collection.metadata.description,
                 breadcrumbs: links,
                 children: rowify(children, self.config.toml.theme.collection_columns),
-                rows: rowify(items, self.config.toml.theme.image_columns),
+                rows: rowify(images, self.config.toml.theme.image_columns),
             },
         );
 
