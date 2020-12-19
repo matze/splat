@@ -48,14 +48,14 @@ struct Collection {
 #[derive(Clone, Serialize)]
 struct Image<'a> {
     path: &'a str,
-    thumbnail: &'a Path,
+    thumbnail: PathBuf,
     width: u32,
     height: u32,
 }
 
 #[derive(Clone, Serialize)]
 struct Child<'a> {
-    path: &'a Path,
+    path: String,
     thumbnail: PathBuf,
     title: &'a str,
 }
@@ -131,8 +131,14 @@ impl<'a> Image<'a> {
             .to_str()
             .ok_or(anyhow!("Failed to stringify {:?}", item.to))?;
 
+        let thumbnail = PathBuf::from("thumbnails").join(
+            item.thumbnail
+                .file_name()
+                .ok_or(anyhow!("{:?} has no file name", item.thumbnail))?,
+        );
+
         Ok(Self {
-            thumbnail: &item.thumbnail,
+            thumbnail: thumbnail,
             path: path,
             width: dims.0,
             height: dims.1,
@@ -183,9 +189,16 @@ impl<'a> Child<'a> {
             .join("thumbnails")
             .join(filename);
 
+        let subdir = collection
+            .path
+            .file_name()
+            .ok_or(anyhow!("{:?} has no filename", collection.path))?
+            .to_string_lossy()
+            .to_string();
+
         Ok(Self {
             thumbnail: thumbnail,
-            path: path,
+            path: subdir,
             title: &collection.metadata.title,
         })
     }
