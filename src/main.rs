@@ -83,6 +83,7 @@ lazy_static! {
     static ref EXTENSIONS: HashSet<OsString> = {
         let mut extensions = HashSet::new();
         extensions.insert(OsString::from("jpg"));
+        extensions.insert(OsString::from("JPG"));
         extensions
     };
 }
