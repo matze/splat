@@ -19,7 +19,6 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 use std::thread;
 use structopt::StructOpt;
-use tera;
 
 #[derive(StructOpt)]
 #[structopt(name = "splat", about = "Static photo gallery generator")]
@@ -96,7 +95,7 @@ fn rowify<T: Clone>(items: Vec<T>, num_columns: usize) -> Vec<Vec<T>> {
         .collect()
 }
 
-fn breadcrumbs_to_links(breadcrumbs: &Vec<String>) -> Vec<Link> {
+fn breadcrumbs_to_links(breadcrumbs: &[String]) -> Vec<Link> {
     let mut path = ".".to_owned();
     let mut links = Vec::new();
 
@@ -128,19 +127,19 @@ impl<'a> Image<'a> {
         let path = item
             .to
             .file_name()
-            .ok_or(anyhow!("{:?} is not a file", item.to))?
+            .ok_or_else(|| anyhow!("{:?} is not a file", item.to))?
             .to_str()
-            .ok_or(anyhow!("Failed to stringify {:?}", item.to))?;
+            .ok_or_else(|| anyhow!("Failed to stringify {:?}", item.to))?;
 
         let thumbnail = PathBuf::from("thumbnails").join(
             item.thumbnail
                 .file_name()
-                .ok_or(anyhow!("{:?} has no file name", item.thumbnail))?,
+                .ok_or_else(|| anyhow!("{:?} has no file name", item.thumbnail))?,
         );
 
         Ok(Self {
-            thumbnail: thumbnail,
-            path: path,
+            thumbnail,
+            path,
             width: dims.0,
             height: dims.1,
         })
@@ -160,7 +159,7 @@ impl Item {
                 .unwrap()
                 .join("thumbnails")
                 .join(path.file_name().unwrap()),
-            to: to,
+            to,
             from: path,
         })
     }
@@ -175,30 +174,30 @@ impl<'a> Child<'a> {
         let path = collection
             .path
             .parent()
-            .ok_or(anyhow!("{:?} has no parent", collection.path))?;
+            .ok_or_else(|| anyhow!("{:?} has no parent", collection.path))?;
 
         let filename = collection
             .thumbnail
             .file_name()
-            .ok_or(anyhow!("{:?} has no filename", collection.thumbnail))?;
+            .ok_or_else(|| anyhow!("{:?} has no filename", collection.thumbnail))?;
 
         let thumbnail = collection
             .thumbnail
             .strip_prefix(path)?
             .parent()
-            .ok_or(anyhow!("{:?} has no parent", collection.thumbnail))?
+            .ok_or_else(|| anyhow!("{:?} has no parent", collection.thumbnail))?
             .join("thumbnails")
             .join(filename);
 
         let subdir = collection
             .path
             .file_name()
-            .ok_or(anyhow!("{:?} has no filename", collection.path))?
+            .ok_or_else(|| anyhow!("{:?} has no filename", collection.path))?
             .to_string_lossy()
             .to_string();
 
         Ok(Self {
-            thumbnail: thumbnail,
+            thumbnail,
             path: subdir,
             title: &collection.metadata.title,
         })
@@ -237,12 +236,12 @@ impl Collection {
         let thumbnail = metadata
             .thumbnail
             .as_ref()
-            .map_or(None, |thumbnail| Some(thumbnail.clone()))
+            .cloned()
             .or_else(|| {
                 items.first().map_or(
                     collections
                         .first()
-                        .map_or(None, |c| Some(c.thumbnail.clone())),
+                        .map(|c| c.thumbnail.clone()),
                     |item| Some(item.from.clone()),
                 )
             })
@@ -250,10 +249,10 @@ impl Collection {
 
         Ok(Some(Collection {
             path: current.to_owned(),
-            collections: collections,
-            items: items,
-            metadata: metadata,
-            thumbnail: thumbnail,
+            collections,
+            items,
+            metadata,
+            thumbnail,
         }))
     }
 
@@ -279,7 +278,7 @@ impl Builder {
             create_dir_all(&config.toml.output)?;
         }
 
-        Ok(Self { config: config })
+        Ok(Self { config })
     }
 
     fn build(&self) -> Result<()> {
@@ -295,7 +294,7 @@ impl Builder {
             &self.config,
         )?;
 
-        let collection = collection.ok_or(anyhow!("No images found"))?;
+        let collection = collection.ok_or_else(|| anyhow!("No images found"))?;
 
         let items = collection
             .items()
@@ -339,7 +338,7 @@ impl Builder {
             );
         });
 
-        processes.into_par_iter().for_each(|p| process(p));
+        processes.into_par_iter().for_each(process);
 
         print!("  Writing HTML pages ...");
         let mut breadcrumbs: Vec<String> = Vec::new();

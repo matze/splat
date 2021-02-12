@@ -77,10 +77,8 @@ fn do_copy(path: &Path, prefix: &Path, output: &Path) -> Result<()> {
         if path.is_dir() {
             create_dir_all(dest)?;
             do_copy(&path, prefix, output)?;
-        } else {
-            if !dest.exists() || is_older(&dest, &path)? {
-                copy(&path, dest)?;
-            }
+        } else if !dest.exists() || is_older(&dest, &path)? {
+            copy(&path, dest)?;
         }
     }
 

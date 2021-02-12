@@ -41,7 +41,7 @@ fn from_str(path: &Path, content: &str) -> Result<Metadata> {
 
     let thumbnail = keys
         .remove("Thumbnail")
-        .map_or(None, |s| Some(path.join(PathBuf::from(s))))
+        .map(|s| path.join(PathBuf::from(s)))
         .filter(|path| path.exists());
 
     let title = keys.remove("Title").unwrap_or(
@@ -54,8 +54,8 @@ fn from_str(path: &Path, content: &str) -> Result<Metadata> {
 
     Ok(Metadata {
         description: html_output,
-        title: title,
-        thumbnail: thumbnail,
+        title,
+        thumbnail,
     })
 }
 

@@ -69,8 +69,8 @@ impl Config {
         let static_path = toml.theme.path.join("static");
 
         Ok(Config {
-            toml: toml,
-            templates: templates,
+            toml,
+            templates,
             static_path: if static_path.exists() {
                 Some(static_path)
             } else {
