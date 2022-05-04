@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use image::imageops;
 use image::io::Reader;
 use std::fs::{copy, create_dir_all};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::mpsc::Sender;
 
 pub struct Process<'a> {
@@ -85,7 +85,7 @@ fn do_copy(path: &Path, prefix: &Path, output: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn copy_recursively(path: &PathBuf, output: &Path) -> Result<()> {
-    let prefix = &path.parent().unwrap();
-    Ok(do_copy(path, &prefix, output)?)
+pub fn copy_recursively(path: &Path, output: &Path) -> Result<()> {
+    let prefix = path.parent().unwrap();
+    do_copy(path, prefix, output)
 }

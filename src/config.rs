@@ -60,9 +60,8 @@ impl Config {
 
     pub fn from(toml: TomlConfig) -> Result<Self> {
         let theme_path = toml.theme.path.join("templates");
-        let mut templates =
-            tera::Tera::new(&theme_path.join("*.html").to_string_lossy().into_owned())
-                .context(format!("Could not load templates from {:?}", theme_path))?;
+        let mut templates = tera::Tera::new(&theme_path.join("*.html").to_string_lossy())
+            .context(format!("Could not load templates from {:?}", theme_path))?;
 
         templates.autoescape_on(vec![]);
 

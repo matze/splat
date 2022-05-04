@@ -6,6 +6,7 @@ mod metadata;
 mod process;
 
 use anyhow::{anyhow, Result};
+use clap::Parser;
 use config::Config;
 use metadata::Metadata;
 use process::{copy_recursively, is_older, process, Process};
@@ -18,7 +19,6 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 use std::thread;
-use clap::Parser;
 
 #[derive(Parser)]
 #[clap(name = "splat", about = "Static photo gallery generator")]
@@ -101,7 +101,7 @@ fn breadcrumbs_to_links(breadcrumbs: &[String]) -> Vec<Link> {
 
     for breadcrumb in breadcrumbs.iter().rev() {
         links.push(Link {
-            title: &breadcrumb,
+            title: breadcrumb,
             path: path.clone(),
         });
         path = format!("{}/..", path);
@@ -211,7 +211,7 @@ impl Collection {
             .filter(|entry| entry.path().is_dir())
             .map(|entry| Collection::from(&entry.path(), output, config))
             .filter_map(Result::ok)
-            .filter_map(|e| e)
+            .flatten()
             .collect();
 
         let items: Vec<Item> = read_dir(current)?
@@ -222,14 +222,14 @@ impl Collection {
                         .extension()
                         .map_or(false, |ext| EXTENSIONS.contains(ext))
             })
-            .map(|e| Item::from(e.path(), &config))
+            .map(|e| Item::from(e.path(), config))
             .collect::<Result<Vec<_>>>()?;
 
         if items.is_empty() && collections.is_empty() {
             return Ok(None);
         }
 
-        let metadata = Metadata::from_path(&current)?;
+        let metadata = Metadata::from_path(current)?;
 
         // Determine thumbnail for this collection. We prioritize the one specified in the metadata
         // over the first item in this collection over the thumbnail of the first child collection.
@@ -238,12 +238,11 @@ impl Collection {
             .as_ref()
             .cloned()
             .or_else(|| {
-                items.first().map_or(
-                    collections
-                        .first()
-                        .map(|c| c.thumbnail.clone()),
-                    |item| Some(item.from.clone()),
-                )
+                items
+                    .first()
+                    .map_or(collections.first().map(|c| c.thumbnail.clone()), |item| {
+                        Some(item.from.clone())
+                    })
             })
             .unwrap(); // TODO: try to get rid of
 
@@ -284,7 +283,7 @@ impl Builder {
     fn build(&self) -> Result<()> {
         if let Some(static_path) = self.config.static_path.as_ref() {
             print!("  Copying static data ...");
-            copy_recursively(&static_path, &self.config.toml.output)?;
+            copy_recursively(static_path, &self.config.toml.output)?;
             println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m Copied static data");
         }
 
@@ -309,7 +308,7 @@ impl Builder {
             .into_iter()
             .map(|item| Process {
                 config: &self.config,
-                item: &item,
+                item,
                 sender: sender.clone(),
             })
             .collect::<Vec<_>>();
@@ -370,7 +369,7 @@ impl Builder {
         let mut images = collection
             .items
             .iter()
-            .map(|item| Image::from(&item))
+            .map(Image::from)
             .collect::<Result<Vec<_>, _>>()?;
 
         images.sort_by(|a, b| a.thumbnail.cmp(&b.thumbnail));
@@ -378,13 +377,13 @@ impl Builder {
         let mut children = collection
             .collections
             .iter()
-            .map(|collection| Child::from(&collection))
+            .map(Child::from)
             .collect::<Result<Vec<_>, _>>()?;
 
-        children.sort_by(|a, b| b.title.cmp(&a.title));
+        children.sort_by(|a, b| b.title.cmp(a.title));
 
         let mut context = tera::Context::new();
-        let links = breadcrumbs_to_links(&breadcrumbs);
+        let links = breadcrumbs_to_links(breadcrumbs);
 
         context.insert(
             "collection",
@@ -397,7 +396,7 @@ impl Builder {
             },
         );
 
-        let static_path = output_path_to_root(&output).join("static");
+        let static_path = output_path_to_root(output).join("static");
         context.insert("theme_url", &static_path);
 
         let index_html = output.join("index.html");

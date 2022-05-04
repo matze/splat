@@ -22,8 +22,8 @@ fn from_str(path: &Path, content: &str) -> Result<Metadata> {
 
     for line in lines {
         if matching_phase {
-            if re.is_match(&line) {
-                let caps = re.captures(&line).unwrap();
+            if re.is_match(line) {
+                let caps = re.captures(line).unwrap();
                 keys.insert(caps[1].to_string(), caps[2].to_string());
                 continue;
             } else {
@@ -31,7 +31,7 @@ fn from_str(path: &Path, content: &str) -> Result<Metadata> {
             }
         }
 
-        description.push_str(&line);
+        description.push_str(line);
         description.push('\n');
     }
 
@@ -44,13 +44,13 @@ fn from_str(path: &Path, content: &str) -> Result<Metadata> {
         .map(|s| path.join(PathBuf::from(s)))
         .filter(|path| path.exists());
 
-    let title = keys.remove("Title").unwrap_or(
+    let title = keys.remove("Title").unwrap_or_else(|| {
         path.file_name()
             .unwrap_or(&OsString::new())
             .to_str()
             .unwrap()
-            .to_owned(),
-    );
+            .to_owned()
+    });
 
     Ok(Metadata {
         description: html_output,
@@ -74,7 +74,7 @@ impl Metadata {
         let mut file = File::open(index)?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
-        Ok(from_str(root, &contents)?)
+        from_str(root, &contents)
     }
 }
 
