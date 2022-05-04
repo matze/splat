@@ -18,15 +18,15 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 use std::thread;
-use structopt::StructOpt;
+use clap::Parser;
 
-#[derive(StructOpt)]
-#[structopt(name = "splat", about = "Static photo gallery generator")]
+#[derive(Parser)]
+#[clap(name = "splat", about = "Static photo gallery generator")]
 enum Commands {
-    #[structopt(about = "Build static gallery")]
+    #[clap(about = "Build static gallery")]
     Build,
 
-    #[structopt(about = "Create new .splat.toml config")]
+    #[clap(about = "Create new .splat.toml config")]
     New,
 }
 
@@ -414,7 +414,7 @@ fn build() -> Result<()> {
 }
 
 fn main() {
-    let commands = Commands::from_args();
+    let commands = Commands::parse();
 
     let result = match commands {
         Commands::Build => build(),
@@ -462,8 +462,8 @@ mod tests {
         File::create(template_dir.join("index.html"))?;
 
         let config = config::TomlConfig {
-            input: input,
-            output: output,
+            input,
+            output,
             theme: config::Theme {
                 path: theme,
                 image_columns: 4,

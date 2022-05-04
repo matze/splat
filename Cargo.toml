@@ -2,10 +2,11 @@
 name = "splat"
 version = "0.1.0"
 authors = ["Matthias Vogelgesang"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 anyhow = "1"
+clap = { version = "3", features = ["derive"] }
 image = "0"
 lazy_static = "1"
 pulldown-cmark = "0"
@@ -13,7 +14,6 @@ rayon = "1"
 regex = "1"
 serde = "1"
 serde_derive = "1"
-structopt = { version = "0", default-features = false }
 tera = "1"
 toml = "0"
 
