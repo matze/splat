@@ -1070,7 +1070,7 @@ dependencies = [
  "anyhow",
  "clap",
  "image",
- "lazy_static",
+ "once_cell",
  "pulldown-cmark",
  "rayon",
  "regex",

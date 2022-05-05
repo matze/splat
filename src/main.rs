@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate lazy_static;
-
 mod config;
 mod metadata;
 mod process;
@@ -9,6 +6,7 @@ use anyhow::{anyhow, Result};
 use clap::Parser;
 use config::Config;
 use metadata::Metadata;
+use once_cell::sync::Lazy;
 use process::{copy_recursively, is_older, process, Process};
 use rayon::prelude::*;
 use serde_derive::Serialize;
@@ -78,14 +76,12 @@ struct Builder {
     config: Config,
 }
 
-lazy_static! {
-    static ref EXTENSIONS: HashSet<OsString> = {
-        let mut extensions = HashSet::new();
-        extensions.insert(OsString::from("jpg"));
-        extensions.insert(OsString::from("JPG"));
-        extensions
-    };
-}
+static EXTENSIONS: Lazy<HashSet<OsString>> = Lazy::new(|| {
+    let mut extensions = HashSet::new();
+    extensions.insert(OsString::from("jpg"));
+    extensions.insert(OsString::from("JPG"));
+    extensions
+});
 
 fn rowify<T: Clone>(items: Vec<T>, num_columns: usize) -> Vec<Vec<T>> {
     items
