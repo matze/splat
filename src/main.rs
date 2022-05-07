@@ -83,6 +83,8 @@ static EXTENSIONS: Lazy<HashSet<OsString>> = Lazy::new(|| {
     extensions
 });
 
+static SPINNERS: Lazy<[&str; 4]> = Lazy::new(|| ["⠖", "⠲", "⠴", "⠦"]);
+
 fn rowify<T: Clone>(items: Vec<T>, num_columns: usize) -> Vec<Vec<T>> {
     items
         .chunks(num_columns)
@@ -310,13 +312,12 @@ impl Builder {
             .collect::<Vec<_>>();
 
         thread::spawn(move || {
-            let spinners = vec!["⠖", "⠲", "⠴", "⠦"];
-            let num_spinners = spinners.len();
+            let num_spinners = SPINNERS.len();
 
             for i in 0..num_items {
                 print!(
                     "\x1B[2K\r\x1B[0;36m{}\x1B[0;m Processing {} images ...",
-                    spinners[i % num_spinners],
+                    SPINNERS[i % num_spinners],
                     num_items - i
                 );
 
