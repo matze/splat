@@ -154,9 +154,9 @@ impl Item {
         Ok(Self {
             thumbnail: to
                 .parent()
-                .unwrap()
+                .ok_or_else(|| anyhow!("No parent"))?
                 .join("thumbnails")
-                .join(path.file_name().unwrap()),
+                .join(path.file_name().ok_or_else(|| anyhow!("Path ends in .."))?),
             to,
             from: path,
         })
@@ -242,7 +242,7 @@ impl Collection {
                         Some(item.from.clone())
                     })
             })
-            .unwrap(); // TODO: try to get rid of
+            .ok_or_else(|| anyhow!("No thumbnail path"))?;
 
         Ok(Some(Collection {
             path: current.to_owned(),
@@ -355,7 +355,11 @@ impl Builder {
         }
 
         for child in &collection.collections {
-            let subdir = child.path.file_name().unwrap();
+            let subdir = child
+                .path
+                .file_name()
+                .ok_or_else(|| anyhow!("Path ends in .."))?;
+
             let output = output.join(subdir);
 
             breadcrumbs.push(subdir.to_string_lossy().to_string());

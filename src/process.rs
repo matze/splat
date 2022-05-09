@@ -1,6 +1,6 @@
 use crate::config;
 use crate::Item;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use image::imageops;
 use image::io::Reader;
 use std::fs::{copy, create_dir_all};
@@ -86,6 +86,6 @@ fn do_copy(path: &Path, prefix: &Path, output: &Path) -> Result<()> {
 }
 
 pub fn copy_recursively(path: &Path, output: &Path) -> Result<()> {
-    let prefix = path.parent().unwrap();
+    let prefix = path.parent().ok_or_else(|| anyhow!("No parent"))?;
     do_copy(path, prefix, output)
 }
