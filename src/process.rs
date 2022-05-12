@@ -34,7 +34,7 @@ fn generate_thumbnail(p: &Process) -> Result<()> {
         }
     }
 
-    if !p.item.thumbnail.exists() || is_older(&p.item.thumbnail, &p.item.from)? {
+    if !p.item.thumbnail.exists() || p.item.thumbnail_outdated()? {
         resize(
             &p.item.from,
             &p.item.thumbnail,

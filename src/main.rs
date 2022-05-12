@@ -165,6 +165,10 @@ impl Item {
     fn needs_update(&self) -> bool {
         !self.to.exists() || is_older(&self.to, &self.from).unwrap() || !self.thumbnail.exists()
     }
+
+    fn thumbnail_outdated(&self) -> Result<bool> {
+        is_older(&self.thumbnail, &self.from)
+    }
 }
 
 impl<'a> Child<'a> {
