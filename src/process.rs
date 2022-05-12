@@ -14,8 +14,6 @@ pub struct Process<'a> {
 }
 
 fn resize(source: &Path, dest: &Path, width: u32, height: u32) -> Result<()> {
-    let source = source.to_owned();
-    let dest = dest.to_owned();
     let image = Reader::open(&source)?
         .decode()
         .context(format!("{:?} does not seem to be a valid image", source))?;
