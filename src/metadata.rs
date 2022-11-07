@@ -1,4 +1,5 @@
 use anyhow::Result;
+use once_cell::sync::Lazy;
 use pulldown_cmark::{html, Parser};
 use regex::Regex;
 use std::collections::HashMap;
@@ -13,8 +14,10 @@ pub struct Metadata {
     pub thumbnail: Option<PathBuf>,
 }
 
+static EXPRESSION: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"([[:alpha:]]+): (.+)").expect("constructing regex"));
+
 fn from_str(path: &Path, content: &str) -> Result<Metadata> {
-    let re = Regex::new(r"([[:alpha:]]+): (.+)")?;
     let lines = content.lines();
     let mut matching_phase = true;
     let mut keys: HashMap<String, String> = HashMap::new();
@@ -22,8 +25,8 @@ fn from_str(path: &Path, content: &str) -> Result<Metadata> {
 
     for line in lines {
         if matching_phase {
-            if re.is_match(line) {
-                let caps = re.captures(line).unwrap();
+            if EXPRESSION.is_match(line) {
+                let caps = EXPRESSION.captures(line).unwrap();
                 keys.insert(caps[1].to_string(), caps[2].to_string());
                 continue;
             }
