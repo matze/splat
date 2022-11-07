@@ -14,7 +14,7 @@ pub struct Process<'a> {
 }
 
 fn resize(source: &Path, dest: &Path, width: u32, height: u32) -> Result<()> {
-    let image = Reader::open(&source)?
+    let image = Reader::open(source)?
         .decode()
         .context(format!("{:?} does not seem to be a valid image", source))?;
     let resized = image.resize_to_fill(width, height, imageops::FilterType::Lanczos3);
@@ -63,8 +63,8 @@ fn wrapped_process(p: &Process) -> Result<()> {
     Ok(())
 }
 
-pub fn process(p: Process) {
-    p.sender.send(wrapped_process(&p)).unwrap();
+pub fn process(p: &Process) {
+    p.sender.send(wrapped_process(p)).unwrap();
 }
 
 fn do_copy(path: &Path, prefix: &Path, output: &Path) -> Result<()> {

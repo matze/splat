@@ -85,11 +85,11 @@ static EXTENSIONS: Lazy<HashSet<OsString>> = Lazy::new(|| {
 
 static SPINNERS: Lazy<[&str; 4]> = Lazy::new(|| ["⠖", "⠲", "⠴", "⠦"]);
 
-fn rowify<T: Clone>(items: Vec<T>, num_columns: usize) -> Vec<Vec<T>> {
+fn rowify<T: Clone>(items: &[T], num_columns: usize) -> Vec<Vec<T>> {
     items
         .chunks(num_columns)
         .into_iter()
-        .map(|chunk| chunk.to_vec())
+        .map(<[T]>::to_vec)
         .collect()
 }
 
@@ -149,7 +149,7 @@ impl Item {
         let to = config
             .toml
             .output
-            .join(&path.strip_prefix(&config.toml.input)?);
+            .join(path.strip_prefix(&config.toml.input)?);
 
         Ok(Self {
             thumbnail: to
@@ -207,11 +207,11 @@ impl<'a> Child<'a> {
 }
 
 impl Collection {
-    fn from(current: &Path, output: &Path, config: &Config) -> Result<Option<Self>> {
+    fn from(current: &Path, config: &Config) -> Result<Option<Self>> {
         let collections: Vec<Collection> = read_dir(current)?
             .filter_map(Result::ok)
             .filter(|entry| entry.path().is_dir())
-            .map(|entry| Collection::from(&entry.path(), output, config))
+            .map(|entry| Collection::from(&entry.path(), config))
             .filter_map(Result::ok)
             .flatten()
             .collect();
@@ -289,13 +289,8 @@ impl Builder {
             println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m Copied static data");
         }
 
-        let collection = Collection::from(
-            &self.config.toml.input,
-            &self.config.toml.output,
-            &self.config,
-        )?;
-
-        let collection = collection.ok_or_else(|| anyhow!("No images found"))?;
+        let collection = Collection::from(&self.config.toml.input, &self.config)?
+            .ok_or_else(|| anyhow!("No images found"))?;
 
         let items = collection
             .items()
@@ -338,7 +333,7 @@ impl Builder {
             );
         });
 
-        processes.into_par_iter().for_each(process);
+        processes.into_par_iter().for_each(|p| process(&p));
 
         print!("  Writing HTML pages ...");
         let mut breadcrumbs: Vec<String> = Vec::new();
@@ -396,8 +391,8 @@ impl Builder {
                 title: &collection.metadata.title,
                 description: &collection.metadata.description,
                 breadcrumbs: links,
-                children: rowify(children, self.config.toml.theme.collection_columns),
-                rows: rowify(images, self.config.toml.theme.image_columns),
+                children: rowify(&children, self.config.toml.theme.collection_columns),
+                rows: rowify(&images, self.config.toml.theme.image_columns),
             },
         );
 
@@ -447,7 +442,6 @@ mod tests {
         fn collect(&self) -> Result<Option<Collection>> {
             Ok(Collection::from(
                 &self.builder.config.toml.input,
-                &self.builder.config.toml.output,
                 &self.builder.config,
             )?)
         }
@@ -465,7 +459,7 @@ mod tests {
         create_dir_all(&template_dir)?;
         File::create(template_dir.join("index.html"))?;
 
-        let config = config::TomlConfig {
+        let config = config::Toml {
             input,
             output,
             theme: config::Theme {

@@ -26,7 +26,7 @@ pub struct Theme {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct TomlConfig {
+pub struct Toml {
     pub input: PathBuf,
     pub output: PathBuf,
     pub theme: Theme,
@@ -35,14 +35,14 @@ pub struct TomlConfig {
 }
 
 pub struct Config {
-    pub toml: TomlConfig,
+    pub toml: Toml,
     pub templates: Tera,
     pub static_path: Option<PathBuf>,
 }
 
 impl Config {
     pub fn new() -> Result<Self> {
-        Config::from(TomlConfig {
+        Config::from(Toml {
             input: PathBuf::from("input"),
             output: PathBuf::from("_build"),
             theme: Theme {
@@ -58,7 +58,7 @@ impl Config {
         })
     }
 
-    pub fn from(toml: TomlConfig) -> Result<Self> {
+    pub fn from(toml: Toml) -> Result<Self> {
         let theme_path = toml.theme.path.join("templates");
         let mut templates = tera::Tera::new(&theme_path.join("*.html").to_string_lossy())
             .context(format!("Could not load templates from {:?}", theme_path))?;
@@ -79,7 +79,7 @@ impl Config {
     }
 
     pub fn read() -> Result<Self> {
-        let toml: TomlConfig = toml::from_str(
+        let toml: Toml = toml::from_str(
             &read_to_string(CONFIG_TOML).context(format!("Could not open {}", CONFIG_TOML))?,
         )
         .context(format!("{} seem to be broken", CONFIG_TOML))?;

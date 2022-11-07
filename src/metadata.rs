@@ -26,9 +26,9 @@ fn from_str(path: &Path, content: &str) -> Result<Metadata> {
                 let caps = re.captures(line).unwrap();
                 keys.insert(caps[1].to_string(), caps[2].to_string());
                 continue;
-            } else {
-                matching_phase = false;
             }
+
+            matching_phase = false;
         }
 
         description.push_str(line);
@@ -65,7 +65,7 @@ impl Metadata {
 
         if !index.exists() {
             return Ok(Metadata {
-                description: "".to_string(),
+                description: String::new(),
                 title: root.file_name().unwrap().to_str().unwrap().to_owned(),
                 thumbnail: None,
             });
