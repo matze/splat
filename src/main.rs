@@ -86,11 +86,7 @@ static EXTENSIONS: Lazy<HashSet<OsString>> = Lazy::new(|| {
 static SPINNERS: Lazy<[&str; 4]> = Lazy::new(|| ["⠖", "⠲", "⠴", "⠦"]);
 
 fn rowify<T: Clone>(items: &[T], num_columns: usize) -> Vec<Vec<T>> {
-    items
-        .chunks(num_columns)
-        .into_iter()
-        .map(<[T]>::to_vec)
-        .collect()
+    items.chunks(num_columns).map(<[T]>::to_vec).collect()
 }
 
 fn breadcrumbs_to_links(breadcrumbs: &[String]) -> Vec<Link> {
