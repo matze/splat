@@ -1,8 +1,7 @@
 use crate::config;
 use crate::Item;
 use anyhow::{anyhow, Context, Result};
-use image::imageops;
-use image::io::Reader;
+use image::{imageops, ImageReader};
 use std::fs::{copy, create_dir_all};
 use std::path::Path;
 use std::sync::mpsc::Sender;
@@ -14,7 +13,7 @@ pub struct Process<'a> {
 }
 
 fn resize(source: &Path, dest: &Path, width: u32, height: u32) -> Result<()> {
-    let image = Reader::open(source)?
+    let image = ImageReader::open(source)?
         .decode()
         .context(format!("{:?} does not seem to be a valid image", source))?;
     let resized = image.resize_to_fill(width, height, imageops::FilterType::Lanczos3);
