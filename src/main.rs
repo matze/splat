@@ -24,7 +24,7 @@ enum Commands {
     #[clap(about = "Build static gallery")]
     Build,
 
-    #[clap(about = "Create new .splat.toml config")]
+    #[clap(about = "Create new splat.toml config")]
     New,
 }
 

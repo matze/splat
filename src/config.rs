@@ -4,7 +4,7 @@ use std::fs::{read_to_string, write};
 use std::path::PathBuf;
 use tera::Tera;
 
-static CONFIG_TOML: &str = ".splat.toml";
+static CONFIG_TOML_FILENAME: &str = "splat.toml";
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Thumbnail {
@@ -80,14 +80,15 @@ impl Config {
 
     pub fn read() -> Result<Self> {
         let toml: Toml = toml::from_str(
-            &read_to_string(CONFIG_TOML).context(format!("Could not open {}", CONFIG_TOML))?,
+            &read_to_string(CONFIG_TOML_FILENAME)
+                .context(format!("Could not open {}", CONFIG_TOML_FILENAME))?,
         )
-        .context(format!("{} seem to be broken", CONFIG_TOML))?;
+        .context(format!("{} seem to be broken", CONFIG_TOML_FILENAME))?;
 
         Config::from(toml)
     }
 
     pub fn write(&self) -> Result<()> {
-        Ok(write(CONFIG_TOML, toml::to_string(&self.toml)?)?)
+        Ok(write(CONFIG_TOML_FILENAME, toml::to_string(&self.toml)?)?)
     }
 }
