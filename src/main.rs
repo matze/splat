@@ -6,10 +6,10 @@ use anyhow::{anyhow, Result};
 use clap::Parser;
 use config::Config;
 use metadata::Metadata;
-use once_cell::sync::Lazy;
 use process::{copy_recursively, is_older, process, Process};
 use rayon::prelude::*;
 use serde_derive::Serialize;
+use std::cell::LazyCell;
 use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fs::{create_dir_all, read_dir, write};
@@ -76,14 +76,14 @@ struct Builder {
     config: Config,
 }
 
-static EXTENSIONS: Lazy<HashSet<OsString>> = Lazy::new(|| {
+const EXTENSIONS: LazyCell<HashSet<OsString>> = LazyCell::new(|| {
     let mut extensions = HashSet::new();
     extensions.insert(OsString::from("jpg"));
     extensions.insert(OsString::from("JPG"));
     extensions
 });
 
-static SPINNERS: Lazy<[&str; 4]> = Lazy::new(|| ["⠖", "⠲", "⠴", "⠦"]);
+const SPINNERS: LazyCell<[&str; 4]> = LazyCell::new(|| ["⠖", "⠲", "⠴", "⠦"]);
 
 fn rowify<T: Clone>(items: &[T], num_columns: usize) -> Vec<Vec<T>> {
     items.chunks(num_columns).map(<[T]>::to_vec).collect()

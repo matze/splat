@@ -1,7 +1,7 @@
 use anyhow::Result;
-use once_cell::sync::Lazy;
 use pulldown_cmark::{html, Parser};
 use regex::Regex;
+use std::cell::LazyCell;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs::File;
@@ -14,8 +14,8 @@ pub struct Metadata {
     pub thumbnail: Option<PathBuf>,
 }
 
-static EXPRESSION: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"([[:alpha:]]+): (.+)").expect("constructing regex"));
+const EXPRESSION: LazyCell<Regex> =
+    LazyCell::new(|| Regex::new(r"([[:alpha:]]+): (.+)").expect("constructing regex"));
 
 fn from_str(path: &Path, content: &str) -> Result<Metadata> {
     let lines = content.lines();
