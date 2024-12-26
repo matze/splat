@@ -107,7 +107,7 @@ fn output_path_to_root(output: &Path) -> PathBuf {
 
 impl<'a> Image<'a> {
     fn from(item: &'a Item) -> Result<Self> {
-        let dims = image::image_dimensions(&item.to)?;
+        let (width, height) = image::image_dimensions(&item.to)?;
 
         let path = item
             .to
@@ -125,8 +125,8 @@ impl<'a> Image<'a> {
         Ok(Self {
             thumbnail,
             path,
-            width: dims.0,
-            height: dims.1,
+            width,
+            height,
         })
     }
 }
