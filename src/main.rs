@@ -476,7 +476,7 @@ mod tests {
         };
 
         Ok(Fixture {
-            builder: Builder::new(Config::from(config)?)?,
+            builder: Builder::new(config.try_into()?)?,
             _dir: dir,
         })
     }

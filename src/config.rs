@@ -42,7 +42,7 @@ pub struct Config {
 
 impl Config {
     pub fn new() -> Result<Self> {
-        Config::from(Toml {
+        Config::try_from(Toml {
             input: PathBuf::from("input"),
             output: PathBuf::from("_build"),
             theme: Theme {
@@ -58,26 +58,6 @@ impl Config {
         })
     }
 
-    pub fn from(toml: Toml) -> Result<Self> {
-        let theme_path = toml.theme.path.join("templates");
-        let mut templates = tera::Tera::new(&theme_path.join("*.html").to_string_lossy())
-            .context(format!("Could not load templates from {:?}", theme_path))?;
-
-        templates.autoescape_on(vec![]);
-
-        let static_path = toml.theme.path.join("static");
-
-        Ok(Config {
-            toml,
-            templates,
-            static_path: if static_path.exists() {
-                Some(static_path)
-            } else {
-                None
-            },
-        })
-    }
-
     pub fn read() -> Result<Self> {
         let toml: Toml = toml::from_str(
             &read_to_string(CONFIG_TOML_FILENAME)
@@ -85,10 +65,31 @@ impl Config {
         )
         .context(format!("{} seem to be broken", CONFIG_TOML_FILENAME))?;
 
-        Config::from(toml)
+        Config::try_from(toml)
     }
 
     pub fn write(&self) -> Result<()> {
         Ok(write(CONFIG_TOML_FILENAME, toml::to_string(&self.toml)?)?)
+    }
+}
+
+impl TryFrom<Toml> for Config {
+    type Error = anyhow::Error;
+
+    fn try_from(toml: Toml) -> Result<Self, Self::Error> {
+        let theme_path = toml.theme.path.join("templates");
+        let mut templates = tera::Tera::new(&theme_path.join("*.html").to_string_lossy())
+            .context(format!("Could not load templates from {:?}", theme_path))?;
+
+        templates.autoescape_on(vec![]);
+
+        let static_path = toml.theme.path.join("static");
+        let static_path = static_path.exists().then_some(static_path);
+
+        Ok(Config {
+            toml,
+            templates,
+            static_path,
+        })
     }
 }
