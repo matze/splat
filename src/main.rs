@@ -10,8 +10,6 @@ use process::{copy_recursively, is_older, process, Process};
 use rayon::prelude::*;
 use serde_derive::Serialize;
 use std::cell::LazyCell;
-use std::collections::HashSet;
-use std::ffi::OsString;
 use std::fs::{create_dir_all, read_dir, write};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -75,13 +73,6 @@ struct Output<'a> {
 struct Builder {
     config: Config,
 }
-
-const EXTENSIONS: LazyCell<HashSet<OsString>> = LazyCell::new(|| {
-    let mut extensions = HashSet::new();
-    extensions.insert(OsString::from("jpg"));
-    extensions.insert(OsString::from("JPG"));
-    extensions
-});
 
 const SPINNERS: LazyCell<[&str; 4]> = LazyCell::new(|| ["⠖", "⠲", "⠴", "⠦"]);
 
@@ -218,7 +209,7 @@ impl Collection {
                 e.path().is_file()
                     && e.path()
                         .extension()
-                        .map_or(false, |ext| EXTENSIONS.contains(ext))
+                        .map_or(false, |ext| ext == "JPG" || ext == "jpg")
             })
             .map(|e| Item::from(e.path(), config))
             .collect::<Result<Vec<_>>>()?;
