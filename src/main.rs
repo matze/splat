@@ -4,7 +4,7 @@ mod process;
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
-use config::Config;
+use config::{Config, Toml};
 use metadata::Metadata;
 use process::{copy_recursively, is_older, process, Process};
 use rayon::prelude::*;
@@ -404,7 +404,7 @@ fn main() {
 
     let result = match commands {
         Commands::Build => build(),
-        Commands::New => Config::new().and_then(|config| config.write()),
+        Commands::New => Toml::default().write(),
     };
 
     if let Err(err) = result {

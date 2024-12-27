@@ -40,9 +40,15 @@ pub struct Config {
     pub static_path: Option<PathBuf>,
 }
 
-impl Config {
-    pub fn new() -> Result<Self> {
-        Config::try_from(Toml {
+impl Toml {
+    pub fn write(&self) -> Result<()> {
+        Ok(write(CONFIG_TOML_FILENAME, toml::to_string(&self)?)?)
+    }
+}
+
+impl Default for Toml {
+    fn default() -> Self {
+        Self {
             input: PathBuf::from("input"),
             output: PathBuf::from("_build"),
             theme: Theme {
@@ -55,9 +61,11 @@ impl Config {
                 height: 300,
             },
             resize: None,
-        })
+        }
     }
+}
 
+impl Config {
     pub fn read() -> Result<Self> {
         let toml: Toml = toml::from_str(
             &read_to_string(CONFIG_TOML_FILENAME)
@@ -66,10 +74,6 @@ impl Config {
         .context(format!("{} seem to be broken", CONFIG_TOML_FILENAME))?;
 
         Config::try_from(toml)
-    }
-
-    pub fn write(&self) -> Result<()> {
-        Ok(write(CONFIG_TOML_FILENAME, toml::to_string(&self.toml)?)?)
     }
 }
 
