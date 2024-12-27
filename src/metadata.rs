@@ -1,12 +1,12 @@
 use anyhow::Result;
 use pulldown_cmark::{html, Parser};
 use regex::Regex;
-use std::cell::LazyCell;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 pub struct Metadata {
     pub description: String,
@@ -14,8 +14,8 @@ pub struct Metadata {
     pub thumbnail: Option<PathBuf>,
 }
 
-const EXPRESSION: LazyCell<Regex> =
-    LazyCell::new(|| Regex::new(r"([[:alpha:]]+): (.+)").expect("constructing regex"));
+static EXPRESSION: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"([[:alpha:]]+): (.+)").expect("constructing regex"));
 
 fn from_str(path: &Path, content: &str) -> Result<Metadata> {
     let lines = content.lines();

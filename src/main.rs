@@ -9,11 +9,11 @@ use metadata::Metadata;
 use process::{copy_recursively, is_older, process, Process};
 use rayon::prelude::*;
 use serde_derive::Serialize;
-use std::cell::LazyCell;
 use std::fs::{create_dir_all, read_dir, write};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
+use std::sync::LazyLock;
 use std::thread;
 
 #[derive(Parser)]
@@ -74,7 +74,7 @@ struct Builder {
     config: Config,
 }
 
-const SPINNERS: LazyCell<[&str; 4]> = LazyCell::new(|| ["⠖", "⠲", "⠴", "⠦"]);
+static SPINNERS: LazyLock<[&str; 4]> = LazyLock::new(|| ["⠖", "⠲", "⠴", "⠦"]);
 
 fn rowify<T: Clone>(items: &[T], num_columns: usize) -> Vec<Vec<T>> {
     items.chunks(num_columns).map(<[T]>::to_vec).collect()
