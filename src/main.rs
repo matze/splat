@@ -150,7 +150,9 @@ impl Item {
     }
 
     fn needs_update(&self) -> bool {
-        !self.to.exists() || is_older(&self.to, &self.from).unwrap() || !self.thumbnail.exists()
+        !self.to.exists()
+            || is_older(&self.to, &self.from).unwrap_or_default()
+            || !self.thumbnail.exists()
     }
 
     fn thumbnail_outdated(&self) -> Result<bool> {
@@ -307,9 +309,16 @@ impl Builder {
                     num_items - i
                 );
 
-                io::stdout().flush().unwrap();
+                if let Err(err) = io::stdout().flush() {
+                    eprintln!("failed to flush stdout: {err:?}");
+                }
 
-                if let Err(result) = receiver.recv().unwrap() {
+                let Ok(result) = receiver.recv() else {
+                    eprintln!("failed to receive item");
+                    continue;
+                };
+
+                if let Err(result) = result {
                     println!("\x1B[2K\r\x1B[0;31mE\x1B[0;m {}", result);
                 }
             }
@@ -320,7 +329,11 @@ impl Builder {
             );
         });
 
-        processes.into_par_iter().for_each(|p| process(&p));
+        processes.into_par_iter().for_each(|p| {
+            if let Err(err) = process(&p) {
+                eprintln!("failed to process an image: {err:?}");
+            }
+        });
 
         print!("  Writing HTML pages ...");
         let mut breadcrumbs: Vec<String> = Vec::new();

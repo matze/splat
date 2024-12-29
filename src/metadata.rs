@@ -2,7 +2,6 @@ use anyhow::Result;
 use pulldown_cmark::{html, Parser};
 use regex::Regex;
 use std::collections::HashMap;
-use std::ffi::OsString;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -17,6 +16,14 @@ pub struct Metadata {
 static EXPRESSION: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"([[:alpha:]]+): (.+)").expect("constructing regex"));
 
+fn path_to_string(path: &Path) -> String {
+    path.file_name()
+        .unwrap_or_default()
+        .to_str()
+        .unwrap_or_default()
+        .to_owned()
+}
+
 fn from_str(path: &Path, content: &str) -> Result<Metadata> {
     let lines = content.lines();
     let mut matching_phase = true;
@@ -25,8 +32,7 @@ fn from_str(path: &Path, content: &str) -> Result<Metadata> {
 
     for line in lines {
         if matching_phase {
-            if EXPRESSION.is_match(line) {
-                let caps = EXPRESSION.captures(line).unwrap();
+            if let Some(caps) = EXPRESSION.captures(line) {
                 keys.insert(caps[1].to_string(), caps[2].to_string());
                 continue;
             }
@@ -47,13 +53,7 @@ fn from_str(path: &Path, content: &str) -> Result<Metadata> {
         .map(|s| path.join(PathBuf::from(s)))
         .filter(|path| path.exists());
 
-    let title = keys.remove("Title").unwrap_or_else(|| {
-        path.file_name()
-            .unwrap_or(&OsString::new())
-            .to_str()
-            .unwrap()
-            .to_owned()
-    });
+    let title = keys.remove("Title").unwrap_or_else(|| path_to_string(path));
 
     Ok(Metadata {
         description: html_output,
@@ -69,7 +69,7 @@ impl Metadata {
         if !index.exists() {
             return Ok(Metadata {
                 description: String::new(),
-                title: root.file_name().unwrap().to_str().unwrap().to_owned(),
+                title: path_to_string(root),
                 thumbnail: None,
             });
         }

@@ -62,8 +62,9 @@ fn wrapped_process(p: &Process) -> Result<()> {
     Ok(())
 }
 
-pub fn process(p: &Process) {
-    p.sender.send(wrapped_process(p)).unwrap();
+pub fn process(p: &Process) -> Result<()> {
+    p.sender.send(wrapped_process(p))?;
+    Ok(())
 }
 
 fn do_copy(path: &Path, prefix: &Path, output: &Path) -> Result<()> {
