@@ -19,10 +19,10 @@ use std::thread;
 #[derive(Parser)]
 #[clap(name = "splat", about = "Static photo gallery generator")]
 enum Commands {
-    #[clap(about = "Build static gallery")]
+    #[clap(about = "Build static gallery", visible_alias = "b")]
     Build,
 
-    #[clap(about = "Create new splat.toml config")]
+    #[clap(about = "Create new splat.toml config", visible_alias = "n")]
     New,
 }
 
