@@ -27,7 +27,7 @@
       <section class="container heading">
         <header>
           <h2 class="is-uppercase">
-            {% for breadcrumb in collection.breadcrumbs | reverse %}
+            {% for breadcrumb in collection.breadcrumbs %}
             <a href="{{ breadcrumb.path }}">{{ breadcrumb.title }}</a> {% if not loop.last %} <span
                class="chevron-pad">›</span> {% endif %}
             {% endfor %}

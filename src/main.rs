@@ -81,18 +81,19 @@ fn rowify<T: Clone>(items: &[T], num_columns: usize) -> Vec<Vec<T>> {
 }
 
 fn breadcrumbs_to_links(breadcrumbs: &[String]) -> Vec<Link> {
-    let mut path = ".".to_owned();
-    let mut links = Vec::new();
+    let mut path = String::from(".");
 
-    for breadcrumb in breadcrumbs.iter().rev() {
-        links.push(Link {
-            title: breadcrumb,
-            path: path.clone(),
-        });
-        path = format!("{}/..", path);
-    }
-
-    links
+    breadcrumbs
+        .iter()
+        .map(|breadcrumb| {
+            let link = Link {
+                title: breadcrumb,
+                path: path.clone(),
+            };
+            path = format!("{}/..", path);
+            link
+        })
+        .collect()
 }
 
 fn output_path_to_root(output: &Path) -> PathBuf {
@@ -659,6 +660,23 @@ mod tests {
         let thumb_dims = image::image_dimensions(thumb_name)?;
         assert_eq!(thumb_dims, (300, 200));
 
+        Ok(())
+    }
+
+    #[test]
+    fn breadcrumb_links() -> Result<()> {
+        let breadcrumbs = [
+            String::from("foo"),
+            String::from("bar"),
+            String::from("baz"),
+        ];
+        let links = breadcrumbs_to_links(&breadcrumbs);
+        assert_eq!(links[0].title, "foo");
+        assert_eq!(links[0].path, ".");
+        assert_eq!(links[1].title, "bar");
+        assert_eq!(links[1].path, "./..");
+        assert_eq!(links[2].title, "baz");
+        assert_eq!(links[2].path, "./../..");
         Ok(())
     }
 }
