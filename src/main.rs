@@ -107,7 +107,7 @@ fn output_path_to_root(output: &Path) -> PathBuf {
 }
 
 impl<'a> Image<'a> {
-    fn from(item: &'a Item) -> Result<Self> {
+    fn new(item: &'a Item) -> Result<Self> {
         let (width, height) = image::image_dimensions(&item.to)?;
 
         let path = item
@@ -133,7 +133,7 @@ impl<'a> Image<'a> {
 }
 
 impl Item {
-    fn from(path: PathBuf, config: &Config) -> Result<Self> {
+    fn new(path: PathBuf, config: &Config) -> Result<Self> {
         let to = config
             .toml
             .output
@@ -197,11 +197,11 @@ impl<'a> Child<'a> {
 }
 
 impl Collection {
-    fn from(current: &Path, config: &Config) -> Result<Option<Self>> {
+    fn new(current: &Path, config: &Config) -> Result<Option<Self>> {
         let collections: Vec<Collection> = read_dir(current)?
             .filter_map(Result::ok)
             .filter(|entry| entry.path().is_dir())
-            .map(|entry| Collection::from(&entry.path(), config))
+            .map(|entry| Collection::new(&entry.path(), config))
             .filter_map(Result::ok)
             .flatten()
             .collect();
@@ -214,7 +214,7 @@ impl Collection {
                         .extension()
                         .map_or(false, |ext| ext == "JPG" || ext == "jpg")
             })
-            .map(|e| Item::from(e.path(), config))
+            .map(|e| Item::new(e.path(), config))
             .collect::<Result<Vec<_>>>()?;
 
         if items.is_empty() && collections.is_empty() {
@@ -279,7 +279,7 @@ impl Builder {
             println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m Copied static data");
         }
 
-        let collection = Collection::from(&self.config.toml.input, &self.config)?
+        let collection = Collection::new(&self.config.toml.input, &self.config)?
             .ok_or_else(|| anyhow!("No images found"))?;
 
         let items = collection
@@ -370,7 +370,7 @@ impl Builder {
         let mut images = collection
             .items
             .iter()
-            .map(Image::from)
+            .map(Image::new)
             .collect::<Result<Vec<_>, _>>()?;
 
         images.sort_by(|a, b| a.thumbnail.cmp(&b.thumbnail));
@@ -441,7 +441,7 @@ mod tests {
 
     impl Fixture {
         fn collect(&self) -> Result<Option<Collection>> {
-            Ok(Collection::from(
+            Ok(Collection::new(
                 &self.builder.config.toml.input,
                 &self.builder.config,
             )?)
