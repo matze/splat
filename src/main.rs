@@ -80,7 +80,7 @@ fn breadcrumbs_to_links(breadcrumbs: &[String]) -> Vec<Link> {
     let mut path = String::from(".");
 
     let mut links: Vec<_> = breadcrumbs
-        .into_iter()
+        .iter()
         .rev()
         .map(|breadcrumb| {
             let link = Link {

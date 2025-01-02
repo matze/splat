@@ -119,7 +119,7 @@ impl Process {
 
         let input = self.input.as_os_str();
         let output = self.output.as_os_str();
-        let mut split = self.command.split(' ').into_iter();
+        let mut split = self.command.split(' ');
 
         let program = split.next().ok_or_else(|| anyhow!("no program given"))?;
 
