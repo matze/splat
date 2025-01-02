@@ -35,8 +35,6 @@ pub struct Process {
 #[derive(Serialize, Deserialize)]
 pub struct Theme {
     pub path: PathBuf,
-    pub image_columns: usize,
-    pub collection_columns: usize,
     pub process: Option<Vec<Process>>,
 }
 
@@ -68,8 +66,6 @@ impl Default for Toml {
             output: PathBuf::from("_build"),
             theme: Theme {
                 path: PathBuf::from("theme"),
-                image_columns: 4,
-                collection_columns: 3,
                 process: None,
             },
             thumbnail: Thumbnail {

@@ -66,8 +66,8 @@ struct Output<'a> {
     title: &'a str,
     description: &'a str,
     breadcrumbs: Vec<Link<'a>>,
-    children: Vec<Vec<Child<'a>>>,
-    rows: Vec<Vec<Image<'a>>>,
+    children: Vec<Child<'a>>,
+    images: Vec<Image<'a>>,
 }
 
 struct Builder {
@@ -75,10 +75,6 @@ struct Builder {
 }
 
 static SPINNERS: LazyLock<[&str; 4]> = LazyLock::new(|| ["⠖", "⠲", "⠴", "⠦"]);
-
-fn rowify<T: Clone>(items: &[T], num_columns: usize) -> Vec<Vec<T>> {
-    items.chunks(num_columns).map(<[T]>::to_vec).collect()
-}
 
 fn breadcrumbs_to_links(breadcrumbs: &[String]) -> Vec<Link> {
     let mut path = String::from(".");
@@ -405,8 +401,8 @@ impl Builder {
                 title: &collection.metadata.title,
                 description: &collection.metadata.description,
                 breadcrumbs,
-                children: rowify(&children, self.config.toml.theme.collection_columns),
-                rows: rowify(&images, self.config.toml.theme.image_columns),
+                children,
+                images,
             },
         );
 
@@ -478,8 +474,6 @@ mod tests {
             output,
             theme: config::Theme {
                 path: theme,
-                image_columns: 4,
-                collection_columns: 3,
                 process: None,
             },
             thumbnail: config::Thumbnail {
