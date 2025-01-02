@@ -83,8 +83,9 @@ fn rowify<T: Clone>(items: &[T], num_columns: usize) -> Vec<Vec<T>> {
 fn breadcrumbs_to_links(breadcrumbs: &[String]) -> Vec<Link> {
     let mut path = String::from(".");
 
-    breadcrumbs
-        .iter()
+    let mut links: Vec<_> = breadcrumbs
+        .into_iter()
+        .rev()
         .map(|breadcrumb| {
             let link = Link {
                 title: breadcrumb,
@@ -93,7 +94,10 @@ fn breadcrumbs_to_links(breadcrumbs: &[String]) -> Vec<Link> {
             path = format!("{}/..", path);
             link
         })
-        .collect()
+        .collect();
+
+    links.reverse();
+    links
 }
 
 fn output_path_to_root(output: &Path) -> PathBuf {
@@ -345,7 +349,8 @@ impl Builder {
         });
 
         print!("  Writing HTML pages ...");
-        let mut breadcrumbs: Vec<String> = Vec::new();
+        // TODO: make "home" configurable
+        let mut breadcrumbs: Vec<String> = vec![String::from("home")];
         self.write_html(&collection, &mut breadcrumbs, &self.config.toml.output)?;
         println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m Wrote HTML pages");
 
@@ -392,14 +397,14 @@ impl Builder {
         children.sort_by(|a, b| b.title.cmp(a.title));
 
         let mut context = tera::Context::new();
-        let links = breadcrumbs_to_links(breadcrumbs);
+        let breadcrumbs = breadcrumbs_to_links(breadcrumbs);
 
         context.insert(
             "collection",
             &Output {
                 title: &collection.metadata.title,
                 description: &collection.metadata.description,
-                breadcrumbs: links,
+                breadcrumbs,
                 children: rowify(&children, self.config.toml.theme.collection_columns),
                 rows: rowify(&images, self.config.toml.theme.image_columns),
             },
@@ -681,11 +686,11 @@ mod tests {
         ];
         let links = breadcrumbs_to_links(&breadcrumbs);
         assert_eq!(links[0].title, "foo");
-        assert_eq!(links[0].path, ".");
+        assert_eq!(links[0].path, "./../..");
         assert_eq!(links[1].title, "bar");
         assert_eq!(links[1].path, "./..");
         assert_eq!(links[2].title, "baz");
-        assert_eq!(links[2].path, "./../..");
+        assert_eq!(links[2].path, ".");
         Ok(())
     }
 }
