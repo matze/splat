@@ -1,5 +1,7 @@
-use anyhow::{Context, Result};
+use crate::process::is_older;
+use anyhow::{anyhow, Context, Result};
 use serde_derive::{Deserialize, Serialize};
+use std::ffi::OsStr;
 use std::fs::{read_to_string, write};
 use std::path::PathBuf;
 use tera::Tera;
@@ -18,11 +20,24 @@ pub struct Resize {
     pub height: u32,
 }
 
+/// Generate `output` from `input` via the `command` which must contain Makefile style $@ and $< to
+/// reference them. `output` is only re-generated when older than `input`.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Process {
+    /// Input path passed to the `command`.
+    input: PathBuf,
+    /// Output path passed to the `command`.
+    output: PathBuf,
+    /// Command to execute to generate `output`, expands $@ to `output` and $< to `input`.
+    command: String,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Theme {
     pub path: PathBuf,
     pub image_columns: usize,
     pub collection_columns: usize,
+    pub process: Option<Vec<Process>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -55,6 +70,7 @@ impl Default for Toml {
                 path: PathBuf::from("theme"),
                 image_columns: 4,
                 collection_columns: 3,
+                process: None,
             },
             thumbnail: Thumbnail {
                 width: 450,
@@ -95,5 +111,37 @@ impl TryFrom<Toml> for Config {
             templates,
             static_path,
         })
+    }
+}
+
+impl Process {
+    /// Expand $< and $@ and run the command.
+    pub fn run(&self) -> Result<()> {
+        if self.output.exists() && !is_older(&self.output, &self.input)? {
+            return Ok(());
+        }
+
+        let input = self.input.as_os_str();
+        let output = self.output.as_os_str();
+        let mut split = self.command.split(' ').into_iter();
+
+        let program = split.next().ok_or_else(|| anyhow!("no program given"))?;
+
+        let args = split
+            .map(|part| match part {
+                "$<" => input,
+                "$@" => output,
+                part => OsStr::new(part),
+            })
+            .collect::<Vec<_>>();
+
+        print!("  Running {program} ...");
+        let output = std::process::Command::new(program).args(args).output()?;
+
+        if output.status.success() {
+            println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m {program} finished successfully");
+        }
+
+        Ok(())
     }
 }

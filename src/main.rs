@@ -279,6 +279,14 @@ impl Builder {
             println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m Copied static data");
         }
 
+        if let Some(processes) = &self.config.toml.theme.process {
+            for process in processes {
+                process.run()?;
+            }
+        }
+
+        // return Ok(());
+
         let collection = Collection::new(&self.config.toml.input, &self.config)?
             .ok_or_else(|| anyhow!("No images found"))?;
 
@@ -467,6 +475,7 @@ mod tests {
                 path: theme,
                 image_columns: 4,
                 collection_columns: 3,
+                process: None,
             },
             thumbnail: config::Thumbnail {
                 width: 300,
