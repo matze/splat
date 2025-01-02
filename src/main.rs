@@ -12,7 +12,7 @@ use serde_derive::Serialize;
 use std::fs::{create_dir_all, read_dir, write};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::channel;
+use std::sync::mpsc;
 use std::sync::LazyLock;
 use std::thread;
 
@@ -285,8 +285,6 @@ impl Builder {
             }
         }
 
-        // return Ok(());
-
         let collection = Collection::new(&self.config.toml.input, &self.config)?
             .ok_or_else(|| anyhow!("No images found"))?;
 
@@ -297,7 +295,7 @@ impl Builder {
             .collect::<Vec<_>>();
 
         let num_items = items.len();
-        let (sender, receiver) = channel::<Result<()>>();
+        let (sender, receiver) = mpsc::channel::<Result<()>>();
 
         let processes = items
             .into_iter()
@@ -308,35 +306,7 @@ impl Builder {
             })
             .collect::<Vec<_>>();
 
-        thread::spawn(move || {
-            let num_spinners = SPINNERS.len();
-
-            for i in 0..num_items {
-                print!(
-                    "\x1B[2K\r\x1B[0;36m{}\x1B[0;m Processing {} images ...",
-                    SPINNERS[i % num_spinners],
-                    num_items - i
-                );
-
-                if let Err(err) = io::stdout().flush() {
-                    eprintln!("failed to flush stdout: {err:?}");
-                }
-
-                let Ok(result) = receiver.recv() else {
-                    eprintln!("failed to receive item");
-                    continue;
-                };
-
-                if let Err(result) = result {
-                    println!("\x1B[2K\r\x1B[0;31mE\x1B[0;m {}", result);
-                }
-            }
-
-            println!(
-                "\x1B[2K\r\x1B[0;32m✔\x1B[0;m Processed {} images",
-                num_items
-            );
-        });
+        thread::spawn(move || display_progress(num_items, receiver));
 
         processes.into_par_iter().for_each(|p| {
             if let Err(err) = process(&p) {
@@ -347,75 +317,111 @@ impl Builder {
         print!("  Writing HTML pages ...");
         // TODO: make "home" configurable
         let mut breadcrumbs: Vec<String> = vec![String::from("home")];
-        self.write_html(&collection, &mut breadcrumbs, &self.config.toml.output)?;
+        write_html(
+            &self.config,
+            &collection,
+            &mut breadcrumbs,
+            &self.config.toml.output,
+        )?;
         println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m Wrote HTML pages");
 
         Ok(())
     }
+}
 
-    fn write_html(
-        &self,
-        collection: &Collection,
-        breadcrumbs: &mut Vec<String>,
-        output: &Path,
-    ) -> Result<()> {
-        if !output.exists() {
-            create_dir_all(output)?;
-        }
+fn display_progress(num_items: usize, receiver: mpsc::Receiver<Result<()>>) {
+    let num_spinners = SPINNERS.len();
 
-        for child in &collection.collections {
-            let subdir = child
-                .path
-                .file_name()
-                .ok_or_else(|| anyhow!("Path ends in .."))?;
-
-            let output = output.join(subdir);
-
-            breadcrumbs.push(subdir.to_string_lossy().to_string());
-            self.write_html(child, breadcrumbs, &output)?;
-            breadcrumbs.remove(breadcrumbs.len() - 1);
-        }
-
-        let mut images = collection
-            .items
-            .iter()
-            .map(Image::new)
-            .collect::<Result<Vec<_>, _>>()?;
-
-        images.sort_by(|a, b| a.thumbnail.cmp(&b.thumbnail));
-
-        let mut children = collection
-            .collections
-            .iter()
-            .map(Child::from)
-            .collect::<Result<Vec<_>, _>>()?;
-
-        children.sort_by(|a, b| b.title.cmp(a.title));
-
-        let mut context = tera::Context::new();
-        let breadcrumbs = breadcrumbs_to_links(breadcrumbs);
-
-        context.insert(
-            "collection",
-            &Output {
-                title: &collection.metadata.title,
-                description: &collection.metadata.description,
-                breadcrumbs,
-                children,
-                images,
-            },
+    for i in 0..num_items {
+        print!(
+            "\x1B[2K\r\x1B[0;36m{}\x1B[0;m Processing {} images ...",
+            SPINNERS[i % num_spinners],
+            num_items - i
         );
 
-        let static_path = output_path_to_root(output).join("static");
-        context.insert("theme_url", &static_path);
+        if let Err(err) = io::stdout().flush() {
+            eprintln!("failed to flush stdout: {err:?}");
+        }
 
-        let index_html = output.join("index.html");
+        let Ok(result) = receiver.recv() else {
+            eprintln!("failed to receive item");
+            continue;
+        };
 
-        Ok(write(
-            index_html,
-            self.config.templates.render("index.html", &context)?,
-        )?)
+        if let Err(result) = result {
+            println!("\x1B[2K\r\x1B[0;31mE\x1B[0;m {}", result);
+        }
     }
+
+    println!(
+        "\x1B[2K\r\x1B[0;32m✔\x1B[0;m Processed {} images",
+        num_items
+    );
+}
+
+/// Write out HTML for the given `collection` and `breadcrumbs` into `output`.
+fn write_html(
+    config: &Config,
+    collection: &Collection,
+    breadcrumbs: &mut Vec<String>,
+    output: &Path,
+) -> Result<()> {
+    if !output.exists() {
+        create_dir_all(output)?;
+    }
+
+    for child in &collection.collections {
+        let subdir = child
+            .path
+            .file_name()
+            .ok_or_else(|| anyhow!("Path ends in .."))?;
+
+        let output = output.join(subdir);
+
+        breadcrumbs.push(subdir.to_string_lossy().to_string());
+        write_html(config, child, breadcrumbs, &output)?;
+        breadcrumbs.remove(breadcrumbs.len() - 1);
+    }
+
+    let mut images = collection
+        .items
+        .iter()
+        .map(Image::new)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    images.sort_by(|a, b| a.thumbnail.cmp(&b.thumbnail));
+
+    let mut children = collection
+        .collections
+        .iter()
+        .map(Child::from)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    children.sort_by(|a, b| b.title.cmp(a.title));
+
+    let mut context = tera::Context::new();
+    let breadcrumbs = breadcrumbs_to_links(breadcrumbs);
+
+    context.insert(
+        "collection",
+        &Output {
+            title: &collection.metadata.title,
+            description: &collection.metadata.description,
+            breadcrumbs,
+            children,
+            images,
+        },
+    );
+
+    let static_path = output_path_to_root(output).join("static");
+    context.insert("theme_url", &static_path);
+
+    let index_html = output.join("index.html");
+
+    Ok(write(
+        index_html,
+        config.templates.render("index.html", &context)?,
+    )?)
 }
 
 fn build() -> Result<()> {
