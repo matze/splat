@@ -8,7 +8,15 @@ A simple [sigal](https://github.com/saimn/sigal) clone written in Rust.
 
 ### Usage
 
-splat is a command line application and uses various sub commands. First, create
-a new base configuration using `splat new` and edit `.splat.toml` to your liking,
-especially adapt the `input` and `output` paths. `output` will be created if it
-does not exist. Then run `splat build` to generate the static output.
+splat is a command line application to generate static photo galleries from a
+source directory of image files, a `splat.toml` configuration file and a theme
+file containing an HTML template and optional assets.
+
+To create an example configuration run `splat new` and edit `splat.toml` to your
+liking, especially adapt the `input` and `output` paths. `output` will be
+created if it does not exist. Then run `splat build` to generate the static
+output.
+
+> [!IMPORTANT]
+> The example theme relies on the Tailwind CSS v4.0 beta compiler. Make sure to
+> install it if you want to use the theme.

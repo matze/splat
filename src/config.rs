@@ -2,11 +2,11 @@ use crate::process::is_older;
 use anyhow::{anyhow, Context, Result};
 use serde_derive::{Deserialize, Serialize};
 use std::ffi::OsStr;
-use std::fs::{read_to_string, write};
+use std::fs::read_to_string;
 use std::path::PathBuf;
 use tera::Tera;
 
-static CONFIG_TOML_FILENAME: &str = "splat.toml";
+pub static TOML_FILENAME: &str = "splat.toml";
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Thumbnail {
@@ -53,37 +53,12 @@ pub struct Config {
     pub static_path: Option<PathBuf>,
 }
 
-impl Toml {
-    pub fn write(&self) -> Result<()> {
-        Ok(write(CONFIG_TOML_FILENAME, toml::to_string(&self)?)?)
-    }
-}
-
-impl Default for Toml {
-    fn default() -> Self {
-        Self {
-            input: PathBuf::from("input"),
-            output: PathBuf::from("_build"),
-            theme: Theme {
-                path: PathBuf::from("theme"),
-                process: None,
-            },
-            thumbnail: Thumbnail {
-                width: 450,
-                height: 300,
-            },
-            resize: None,
-        }
-    }
-}
-
 impl Config {
     pub fn read() -> Result<Self> {
         let toml: Toml = toml::from_str(
-            &read_to_string(CONFIG_TOML_FILENAME)
-                .context(format!("Could not open {}", CONFIG_TOML_FILENAME))?,
+            &read_to_string(TOML_FILENAME).context(format!("Could not open {}", TOML_FILENAME))?,
         )
-        .context(format!("{} seem to be broken", CONFIG_TOML_FILENAME))?;
+        .context(format!("{} seem to be broken", TOML_FILENAME))?;
 
         Config::try_from(toml)
     }

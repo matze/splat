@@ -4,7 +4,7 @@ mod process;
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
-use config::{Config, Toml};
+use config::Config;
 use metadata::Metadata;
 use process::{copy_recursively, is_older, process, Process};
 use rayon::prelude::*;
@@ -22,7 +22,10 @@ enum Commands {
     #[clap(about = "Build static gallery", visible_alias = "b")]
     Build,
 
-    #[clap(about = "Create new splat.toml config", visible_alias = "n")]
+    #[clap(
+        about = "Create new splat.toml config and example theme",
+        visible_alias = "n"
+    )]
     New,
 }
 
@@ -441,12 +444,51 @@ fn run_build() -> Result<()> {
     build(&Config::read()?)
 }
 
+/// Write out configuration and default theme.
+fn run_new() -> Result<()> {
+    let paths = ["theme/static/css", "theme/static/js", "theme/templates"];
+
+    for path in paths {
+        let path = PathBuf::from(path);
+
+        if !path.exists() {
+            create_dir_all(path)?;
+        }
+    }
+
+    write(config::TOML_FILENAME, include_str!("../example/splat.toml"))?;
+
+    write(
+        "theme/input.css",
+        include_str!("../example/theme/input.css"),
+    )?;
+
+    write(
+        "theme/static/css/photoswipe.css",
+        include_str!("../example/theme/static/css/photoswipe.css"),
+    )?;
+
+    write(
+        "theme/static/js/photoswipe-lightbox.esm.min.js",
+        include_str!("../example/theme/static/js/photoswipe-lightbox.esm.min.js"),
+    )?;
+
+    write(
+        "theme/static/js/photoswipe.esm.min.js",
+        include_str!("../example/theme/static/js/photoswipe.esm.min.js"),
+    )?;
+
+    println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m Wrote splat.toml and theme directory");
+
+    Ok(())
+}
+
 fn main() {
     let commands = Commands::parse();
 
     let result = match commands {
         Commands::Build => run_build(),
-        Commands::New => Toml::default().write(),
+        Commands::New => run_new(),
     };
 
     if let Err(err) = result {
