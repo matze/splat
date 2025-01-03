@@ -70,10 +70,6 @@ struct Output<'a> {
     images: Vec<Image<'a>>,
 }
 
-struct Builder {
-    config: Config,
-}
-
 static SPINNERS: LazyLock<[&str; 4]> = LazyLock::new(|| ["⠖", "⠲", "⠴", "⠦"]);
 
 fn breadcrumbs_to_links(breadcrumbs: &[String]) -> Vec<Link> {
@@ -259,74 +255,64 @@ impl Collection {
     }
 }
 
-impl Builder {
-    fn new(config: Config) -> Result<Self> {
-        if !config.toml.input.exists() {
-            return Err(anyhow!("{:?} does not exist", config.toml.input));
-        }
-
-        if !config.toml.output.exists() {
-            create_dir_all(&config.toml.output)?;
-        }
-
-        Ok(Self { config })
+/// Build the gallery and all required assets.
+fn build(config: &Config) -> Result<()> {
+    if !config.toml.input.exists() {
+        return Err(anyhow!("{:?} does not exist", config.toml.input));
     }
 
-    fn build(&self) -> Result<()> {
-        if let Some(static_path) = self.config.static_path.as_ref() {
-            print!("  Copying static data ...");
-            copy_recursively(static_path, &self.config.toml.output)?;
-            println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m Copied static data");
-        }
-
-        if let Some(processes) = &self.config.toml.theme.process {
-            for process in processes {
-                process.run()?;
-            }
-        }
-
-        let collection = Collection::new(&self.config.toml.input, &self.config)?
-            .ok_or_else(|| anyhow!("No images found"))?;
-
-        let items = collection
-            .items()
-            .into_iter()
-            .filter(|item| item.needs_update())
-            .collect::<Vec<_>>();
-
-        let num_items = items.len();
-        let (sender, receiver) = mpsc::channel::<Result<()>>();
-
-        let processes = items
-            .into_iter()
-            .map(|item| Process {
-                config: &self.config,
-                item,
-                sender: sender.clone(),
-            })
-            .collect::<Vec<_>>();
-
-        thread::spawn(move || display_progress(num_items, receiver));
-
-        processes.into_par_iter().for_each(|p| {
-            if let Err(err) = process(&p) {
-                eprintln!("failed to process an image: {err:?}");
-            }
-        });
-
-        print!("  Writing HTML pages ...");
-        // TODO: make "home" configurable
-        let mut breadcrumbs: Vec<String> = vec![String::from("home")];
-        write_html(
-            &self.config,
-            &collection,
-            &mut breadcrumbs,
-            &self.config.toml.output,
-        )?;
-        println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m Wrote HTML pages");
-
-        Ok(())
+    if !config.toml.output.exists() {
+        create_dir_all(&config.toml.output)?;
     }
+
+    if let Some(static_path) = config.static_path.as_ref() {
+        print!("  Copying static data ...");
+        copy_recursively(static_path, &config.toml.output)?;
+        println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m Copied static data");
+    }
+
+    if let Some(processes) = &config.toml.theme.process {
+        for process in processes {
+            process.run()?;
+        }
+    }
+
+    let collection =
+        Collection::new(&config.toml.input, config)?.ok_or_else(|| anyhow!("No images found"))?;
+
+    let items = collection
+        .items()
+        .into_iter()
+        .filter(|item| item.needs_update())
+        .collect::<Vec<_>>();
+
+    let num_items = items.len();
+    let (sender, receiver) = mpsc::channel::<Result<()>>();
+
+    let processes = items
+        .into_iter()
+        .map(|item| Process {
+            config,
+            item,
+            sender: sender.clone(),
+        })
+        .collect::<Vec<_>>();
+
+    thread::spawn(move || display_progress(num_items, receiver));
+
+    processes.into_par_iter().for_each(|p| {
+        if let Err(err) = process(&p) {
+            eprintln!("failed to process an image: {err:?}");
+        }
+    });
+
+    print!("  Writing HTML pages ...");
+    // TODO: make "home" configurable
+    let mut breadcrumbs: Vec<String> = vec![String::from("home")];
+    write_html(config, &collection, &mut breadcrumbs, &config.toml.output)?;
+    println!("\x1B[2K\r\x1B[0;32m✔\x1B[0;m Wrote HTML pages");
+
+    Ok(())
 }
 
 fn display_progress(num_items: usize, receiver: mpsc::Receiver<Result<()>>) {
@@ -424,15 +410,15 @@ fn write_html(
     )?)
 }
 
-fn build() -> Result<()> {
-    Builder::new(Config::read()?)?.build()
+fn run_build() -> Result<()> {
+    build(&Config::read()?)
 }
 
 fn main() {
     let commands = Commands::parse();
 
     let result = match commands {
-        Commands::Build => build(),
+        Commands::Build => run_build(),
         Commands::New => Toml::default().write(),
     };
 
@@ -450,16 +436,13 @@ mod tests {
     use tempfile::{tempdir, TempDir};
 
     struct Fixture {
-        builder: Builder,
+        config: Config,
         _dir: TempDir,
     }
 
     impl Fixture {
         fn collect(&self) -> Result<Option<Collection>> {
-            Ok(Collection::new(
-                &self.builder.config.toml.input,
-                &self.builder.config,
-            )?)
+            Ok(Collection::new(&self.config.toml.input, &self.config)?)
         }
     }
 
@@ -495,7 +478,7 @@ mod tests {
         };
 
         Ok(Fixture {
-            builder: Builder::new(config.try_into()?)?,
+            config: config.try_into()?,
             _dir: dir,
         })
     }
@@ -511,7 +494,7 @@ mod tests {
     #[test]
     fn no_image_is_none_collection() -> Result<()> {
         let f = setup(None)?;
-        File::create(f.builder.config.toml.input.join("foo.bar"))?;
+        File::create(f.config.toml.input.join("foo.bar"))?;
         let collection = f.collect()?;
         assert!(collection.is_none());
         Ok(())
@@ -520,7 +503,7 @@ mod tests {
     #[test]
     fn single_image_is_some_collection() -> Result<()> {
         let f = setup(None)?;
-        File::create(f.builder.config.toml.input.join("test.jpg"))?;
+        File::create(f.config.toml.input.join("test.jpg"))?;
         let collection = f.collect()?;
         assert!(collection.is_some());
 
@@ -532,29 +515,23 @@ mod tests {
     #[test]
     fn choose_metadata_thumbnail() -> Result<()> {
         let f = setup(None)?;
-        File::create(&f.builder.config.toml.input.join("1.jpg"))?;
-        File::create(&f.builder.config.toml.input.join("2.jpg"))?;
-        File::create(&f.builder.config.toml.input.join("3.jpg"))?;
-        write(
-            f.builder.config.toml.input.join("index.md"),
-            "Thumbnail: 2.jpg",
-        )?;
+        File::create(&f.config.toml.input.join("1.jpg"))?;
+        File::create(&f.config.toml.input.join("2.jpg"))?;
+        File::create(&f.config.toml.input.join("3.jpg"))?;
+        write(f.config.toml.input.join("index.md"), "Thumbnail: 2.jpg")?;
 
         let collection = f.collect()?.unwrap();
-        assert_eq!(
-            collection.thumbnail,
-            f.builder.config.toml.input.join("2.jpg")
-        );
+        assert_eq!(collection.thumbnail, f.config.toml.input.join("2.jpg"));
         Ok(())
     }
 
     #[test]
     fn choose_root_thumbnail() -> Result<()> {
         let f = setup(None)?;
-        let image_path = f.builder.config.toml.input.join("test.jpg");
+        let image_path = f.config.toml.input.join("test.jpg");
         File::create(&image_path)?;
         write(
-            f.builder.config.toml.input.join("index.md"),
+            f.config.toml.input.join("index.md"),
             "Thumbnail: doesnotexist.jpg",
         )?;
 
@@ -566,10 +543,10 @@ mod tests {
     #[test]
     fn choose_root_thumbnail_on_conflict() -> Result<()> {
         let f = setup(None)?;
-        let image_path = f.builder.config.toml.input.join("test.jpg");
+        let image_path = f.config.toml.input.join("test.jpg");
         File::create(&image_path)?;
         write(
-            f.builder.config.toml.input.join("index.md"),
+            f.config.toml.input.join("index.md"),
             "Thumbnail: doesnotexist.jpg",
         )?;
 
@@ -581,7 +558,7 @@ mod tests {
     #[test]
     fn choose_subdir_thumbnail() -> Result<()> {
         let f = setup(None)?;
-        let subdir = f.builder.config.toml.input.join("a");
+        let subdir = f.config.toml.input.join("a");
         create_dir(&subdir)?;
         let image_path = subdir.join("test.jpg");
         File::create(&image_path)?;
@@ -594,7 +571,7 @@ mod tests {
     #[test]
     fn single_image_in_subdir() -> Result<()> {
         let f = setup(None)?;
-        let subdir = f.builder.config.toml.input.join("a");
+        let subdir = f.config.toml.input.join("a");
         create_dir(&subdir)?;
         File::create(subdir.join("test.jpg"))?;
 
@@ -615,9 +592,9 @@ mod tests {
     fn index_in_root_dir() -> Result<()> {
         let f = setup(None)?;
 
-        File::create(f.builder.config.toml.input.join("test.jpg"))?;
+        File::create(f.config.toml.input.join("test.jpg"))?;
 
-        write(f.builder.config.toml.input.join("index.md"), METADATA)?;
+        write(f.config.toml.input.join("index.md"), METADATA)?;
         let collection = f.collect()?;
         assert!(collection.is_some());
 
@@ -631,14 +608,11 @@ mod tests {
         let f = setup(None)?;
 
         // Copy test.jpg, which is 900x600 pixels to the root input dir.
-        copy(
-            "data/test.jpg",
-            f.builder.config.toml.input.join("test.jpg"),
-        )?;
+        copy("data/test.jpg", f.config.toml.input.join("test.jpg"))?;
 
-        f.builder.build()?;
-        let copy_name = f.builder.config.toml.output.join("test.jpg");
-        let thumb_name = f.builder.config.toml.output.join("thumbnails/test.jpg");
+        build(&f.config)?;
+        let copy_name = f.config.toml.output.join("test.jpg");
+        let thumb_name = f.config.toml.output.join("thumbnails/test.jpg");
 
         assert!(copy_name.exists());
         assert!(thumb_name.exists());
@@ -656,14 +630,11 @@ mod tests {
     fn process_resize() -> Result<()> {
         let f = setup(Some((600, 400)))?;
         // Copy test.jpg, which is 900x600 pixels to the root input dir.
-        copy(
-            "data/test.jpg",
-            f.builder.config.toml.input.join("test.jpg"),
-        )?;
+        copy("data/test.jpg", f.config.toml.input.join("test.jpg"))?;
 
-        f.builder.build()?;
-        let copy_name = f.builder.config.toml.output.join("test.jpg");
-        let thumb_name = f.builder.config.toml.output.join("thumbnails/test.jpg");
+        build(&f.config)?;
+        let copy_name = f.config.toml.output.join("test.jpg");
+        let thumb_name = f.config.toml.output.join("thumbnails/test.jpg");
 
         assert!(copy_name.exists());
         assert!(thumb_name.exists());
