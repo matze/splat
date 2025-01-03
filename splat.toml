@@ -1,0 +1,12 @@
+input = "source"
+output = "."
+
+[theme]
+path = "theme"
+process = [
+    { input = "theme/input.css", output = "static/css/app.css", command = "tailwindcss -m -i $< -o $@" }
+]
+
+[thumbnail]
+width = 450
+height = 300

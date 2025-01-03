@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>source</title>
-  <link rel="stylesheet" href="static/css/app.css">
-  <link rel="stylesheet" href="static/css/photoswipe.css">
+  <title>{{ collection.title }}</title>
+  <link rel="stylesheet" href="{{ theme_url }}/css/app.css">
+  <link rel="stylesheet" href="{{ theme_url }}/css/photoswipe.css">
   <style>
   @import url('https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed&display=swap');
   </style>
   <script type="module">
-    import PhotoSwipeLightbox from "static/js/photoswipe-lightbox.esm.min.js";
-    import PhotoSwipe from "static/js/photoswipe.esm.min.js";
+    import PhotoSwipeLightbox from "{{ theme_url }}/js/photoswipe-lightbox.esm.min.js";
+    import PhotoSwipe from "{{ theme_url }}/js/photoswipe.esm.min.js";
 
     const lightbox = new PhotoSwipeLightbox({
       gallery: "#gallery",
@@ -47,38 +47,40 @@
   <main class="container mx-auto px-4">
     <!-- Navigation -->
     <div class="flex flex-row space-x-3 font-bold uppercase text-3xl text-zinc-100 my-8">
-      
-      <div><a href=".">home</a></div>
-      
-      
+      {% for breadcrumb in collection.breadcrumbs %}
+      <div><a href="{{ breadcrumb.path }}">{{ breadcrumb.title }}</a></div>
+      {% if not loop.last %}<div>›</div>{% endif %}
+      {% endfor %}
     </div>
 
-    
+    {% if collection.children %}
     <!-- Display collections -->
     <div class="flex flex-wrap gap-4">
-      
+      {% for child in collection.children %}
       <div class="relative">
-        <a href="technology">
+        <a href="{{ child.path }}">
         <div class="brightness-50 hover:brightness-100 transition-all">
-          <img class="rounded-lg" src="technology/thumbnails/gidon-wessner-4CI4ETFEY2M-unsplash.jpg" />
+          <img class="rounded-lg" src="{{ child.thumbnail }}" />
         </div>
-        <div class="absolute bottom-0 inset-x-0 m-2 text-xl font-bold">technology</div>
+        <div class="absolute bottom-0 inset-x-0 m-2 text-xl font-bold">{{ child.title }}</div>
         </a>
       </div>
-      
-      <div class="relative">
-        <a href="street photography">
-        <div class="brightness-50 hover:brightness-100 transition-all">
-          <img class="rounded-lg" src="street photography/thumbnails/nicolas-i-t-AtKoc6lu0-unsplash.jpg" />
-        </div>
-        <div class="absolute bottom-0 inset-x-0 m-2 text-xl font-bold">street photography</div>
-        </a>
-      </div>
-      
+      {% endfor %}
     </div>
-    
+    {% endif %}
 
-    
+    {% if collection.images %}
+    <!-- Display photos -->
+    <div class="flex flex-wrap gap-4" id="gallery">
+      {% for image in collection.images %}
+      <div class="brightness-75 hover:brightness-100 transition-all">
+        <a href="{{ image.path }}" data-pswp-width="{{ image.width }}" data-pswp-height="{{ image.height }}" target="_blank">
+          <img class="rounded-lg" src="{{ image.thumbnail }}" />
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
   </main>
 </body>
 </html>

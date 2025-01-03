@@ -1,173 +1,93 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>street photography</title>
-    <link rel="stylesheet" href="../static/css/normalize.css">
-    <link rel="stylesheet" href="../static/css/milligram.min.css">
-    <link rel="stylesheet" href="../static/css/photoswipe.css">
-    <link rel="stylesheet" href="../static/css/default-skin.css">
-    <link rel="stylesheet" href="../static/css/custom.css">
-    <script src="../static/js/photoswipe.min.js"></script>
-    <script src="../static/js/photoswipe-ui-default.min.js"></script>
-  </head>
-  <body>
-    <main class="wrapper">
-      <nav class="navigation">
-        <section class="container">
-          <ul class="navigation-list float-left">
-            <li class="navigation-item is-uppercase"><a href="/">home</a></li>
-            <li class="navigation-item">&middot;</li>
-            <li class="navigation-item is-uppercase"><a href="https://github.com/matze/splat">splat</a></li>
-          </ul>
-        </section>
-      </nav>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>street photography</title>
+  <link rel="stylesheet" href="../static/css/app.css">
+  <link rel="stylesheet" href="../static/css/photoswipe.css">
+  <style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed&display=swap');
+  </style>
+  <script type="module">
+    import PhotoSwipeLightbox from "../static/js/photoswipe-lightbox.esm.min.js";
+    import PhotoSwipe from "../static/js/photoswipe.esm.min.js";
 
-      <section class="container heading">
-        <header>
-          <h2 class="is-uppercase">
-            
-            <a href=".">street photography</a> 
-            
-          </h2>
-        </header>
-      </section>
+    const lightbox = new PhotoSwipeLightbox({
+      gallery: "#gallery",
+      children: "a",
+      pswpModule: PhotoSwipe,
+    });
 
-      <section class="container">
-        
+    lightbox.on('uiRegister', function() {
+      lightbox.pswp.ui.registerElement({
+        name: 'download-button',
+        order: 8,
+        isButton: true,
+        tagName: 'a',
 
-        
-        
-        <div class="row">
-        
-        
-          <div class="column">
-            <div class="clickable" onClick="onThumbnailClick(0)"><img title="title" src="thumbnails/nicolas-i-t-AtKoc6lu0-unsplash.jpg"/></div>
-          </div>
-        
-        
-          <div class="column">
-            <div class="clickable" onClick="onThumbnailClick(1)"><img title="title" src="thumbnails/alex-motoc-CX2gaaOKZVc-unsplash.jpg"/></div>
-          </div>
-        
-        
-          <div class="column">
-            <div class="clickable" onClick="onThumbnailClick(2)"><img title="title" src="thumbnails/alexandra-fuller-skqYcBRGPWI-unsplash.jpg"/></div>
-          </div>
-        
-        
-          <div class="column">
-            <div class="clickable" onClick="onThumbnailClick(3)"><img title="title" src="thumbnails/jared-murray-nuQH89C211c-unsplash.jpg"/></div>
-          </div>
-        
-        </div>
-        
+        html: '<svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true" class="pswp__icn"><path d="M20.5 14.3 17.1 18V10h-2.2v7.9l-3.4-3.6L10 16l6 6.1 6-6.1ZM23 23H9v2h14Z" /></svg>',
 
-        <div class="row">
-          <div class="column">
-          
-          </div>
-        </div>
-      </section>
+        onInit: (el, pswp) => {
+          el.setAttribute('download', '');
+          el.setAttribute('target', '_blank');
+          el.setAttribute('rel', 'noopener');
 
-      <footer class="footer">
-        <section class="container is-centered">
-          All content licensed <a rel="license" href="http://creativecommons.org/licenses/by-nd/4.0">CC BY-ND 4.0</a>
-        </section>
-      </footer>
-    </main>
+          pswp.on('change', () => {
+            el.href = pswp.currSlide.data.src;
+          });
+        }
+      });
+    });
 
-    <div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
-      <div class="pswp__bg"></div>
-
-      <div class="pswp__scroll-wrap">
-        <div class="pswp__container">
-          <div class="pswp__item"></div>
-          <div class="pswp__item"></div>
-          <div class="pswp__item"></div>
-        </div>
-
-        <div class="pswp__ui pswp__ui--hidden">
-          <div class="pswp__top-bar">
-            <button class="pswp__button pswp__button--close" title="Close"></button>
-            <button class="pswp__button pswp__button--fs" title="Fullscreen"></button>
-            <button class="pswp__button pswp__button--zoom" title="Zoom"></button>
-
-            <div class="pswp__preloader">
-              <div class="pswp__preloader_icn">
-                <div class="pswp__preloader_cut">
-                  <div class="pswp__preloader_donut"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <button class="pswp__button pswp__button--arrow--left" title="Previous"></button>
-          <button class="pswp__button pswp__button--arrow--right" title="Next"></button>
-          <div class="pswp__caption">
-            <div class="pswp__caption__center"></div>
-          </div>
-        </div>
-      </div>
+    lightbox.init();
+  </script>
+</head>
+<body class="bg-zinc-800 text-white font-display">
+  <main class="container mx-auto px-4">
+    <!-- Navigation -->
+    <div class="flex flex-row space-x-3 font-bold uppercase text-3xl text-zinc-100 my-8">
+      
+      <div><a href="./..">home</a></div>
+      <div>›</div>
+      
+      <div><a href=".">street photography</a></div>
+      
+      
     </div>
 
-    <script type="text/javascript">
-      var pswpElement = document.querySelectorAll('.pswp')[0];
+    
 
-      var items = [
-        
-        
-        {
-          msrc: 'thumbnails/nicolas-i-t-AtKoc6lu0-unsplash.jpg',
-          src: 'nicolas-i-t-AtKoc6lu0-unsplash.jpg',
-          orig: 'nicolas-i-t-AtKoc6lu0-unsplash.jpg',
-          w: 1639,
-          h: 2048,
-        },
-        
-        {
-          msrc: 'thumbnails/alex-motoc-CX2gaaOKZVc-unsplash.jpg',
-          src: 'alex-motoc-CX2gaaOKZVc-unsplash.jpg',
-          orig: 'alex-motoc-CX2gaaOKZVc-unsplash.jpg',
-          w: 2048,
-          h: 1365,
-        },
-        
-        {
-          msrc: 'thumbnails/alexandra-fuller-skqYcBRGPWI-unsplash.jpg',
-          src: 'alexandra-fuller-skqYcBRGPWI-unsplash.jpg',
-          orig: 'alexandra-fuller-skqYcBRGPWI-unsplash.jpg',
-          w: 1536,
-          h: 2048,
-        },
-        
-        {
-          msrc: 'thumbnails/jared-murray-nuQH89C211c-unsplash.jpg',
-          src: 'jared-murray-nuQH89C211c-unsplash.jpg',
-          orig: 'jared-murray-nuQH89C211c-unsplash.jpg',
-          w: 1638,
-          h: 2048,
-        },
-        
-        
-      ];
-
-      var onThumbnailClick = function(index) {
-        var options = {
-          index: index,
-          bgOpacity: 0.9,
-          shareEl: false,
-          counterEl: false,
-        };
-
-        var gallery = new PhotoSwipe(pswpElement, PhotoSwipeUI_Default, items, options);
-        gallery.init();
-
-        var button = document.querySelectorAll('.pswp__button--download')[0];
-        button.onclick = function() {
-          window.location = gallery.currItem.orig;
-        };
-      };
-    </script>
-  </body>
+    
+    <!-- Display photos -->
+    <div class="flex flex-wrap gap-4" id="gallery">
+      
+      <div class="brightness-75 hover:brightness-100 transition-all">
+        <a href="alex-motoc-CX2gaaOKZVc-unsplash.jpg" data-pswp-width="2048" data-pswp-height="1365" target="_blank">
+          <img class="rounded-lg" src="thumbnails/alex-motoc-CX2gaaOKZVc-unsplash.jpg" />
+        </a>
+      </div>
+      
+      <div class="brightness-75 hover:brightness-100 transition-all">
+        <a href="alexandra-fuller-skqYcBRGPWI-unsplash.jpg" data-pswp-width="1536" data-pswp-height="2048" target="_blank">
+          <img class="rounded-lg" src="thumbnails/alexandra-fuller-skqYcBRGPWI-unsplash.jpg" />
+        </a>
+      </div>
+      
+      <div class="brightness-75 hover:brightness-100 transition-all">
+        <a href="jared-murray-nuQH89C211c-unsplash.jpg" data-pswp-width="1638" data-pswp-height="2048" target="_blank">
+          <img class="rounded-lg" src="thumbnails/jared-murray-nuQH89C211c-unsplash.jpg" />
+        </a>
+      </div>
+      
+      <div class="brightness-75 hover:brightness-100 transition-all">
+        <a href="nicolas-i-t-AtKoc6lu0-unsplash.jpg" data-pswp-width="1639" data-pswp-height="2048" target="_blank">
+          <img class="rounded-lg" src="thumbnails/nicolas-i-t-AtKoc6lu0-unsplash.jpg" />
+        </a>
+      </div>
+      
+    </div>
+    
+  </main>
+</body>
 </html>
