@@ -26,52 +26,79 @@ enum Commands {
     New,
 }
 
+/// Image item to process.
 pub struct Item {
+    /// Source image.
     from: PathBuf,
+    /// Target image.
     to: PathBuf,
+    /// Thumbnail generated from `from`.
     thumbnail: PathBuf,
 }
 
+/// A [`Collection`] contains either other [`Collection`]s or a bunch of [`Item`]s.
 struct Collection {
     path: PathBuf,
+    /// Child collections.
     collections: Vec<Collection>,
+    /// Image items.
     items: Vec<Item>,
+    /// Parsed metadata from index.md's.
     metadata: Metadata,
+    /// Path to the process thumbnail.
     thumbnail: PathBuf,
 }
 
+/// A fullsize image, its thumbnail and its image dimensions as used in the HTML templates.
 #[derive(Clone, Serialize)]
 struct Image<'a> {
+    /// Path to the image.
     path: &'a str,
+    /// Path to the thumbnail.
     thumbnail: PathBuf,
+    /// Width of the image.
     width: u32,
+    /// Height of the image.
     height: u32,
 }
 
+/// Individual subcollection.
 #[derive(Clone, Serialize)]
 struct Child<'a> {
+    /// Path to the collection.
     path: String,
+    /// Collection thumbnail.
     thumbnail: PathBuf,
+    /// Title of the collection.
     title: &'a str,
 }
 
+/// A breadcrumb link.
 #[derive(Serialize)]
 struct Link<'a> {
     title: &'a str,
     path: String,
 }
 
+/// Context passed to the tera template.
 #[derive(Serialize)]
 struct Output<'a> {
+    /// Title of the collection.
     title: &'a str,
+    /// Description of the collection.
     description: &'a str,
+    /// Breadcrumb links leading to this collection.
     breadcrumbs: Vec<Link<'a>>,
+    /// Subcollections.
     children: Vec<Child<'a>>,
+    /// Images part of this collection.
     images: Vec<Image<'a>>,
 }
 
+/// Spinner images.
 static SPINNERS: LazyLock<[&str; 4]> = LazyLock::new(|| ["⠖", "⠲", "⠴", "⠦"]);
 
+/// Compute breadcrumb links from a list of strings.
 fn breadcrumbs_to_links(breadcrumbs: &[String]) -> Vec<Link> {
     let mut path = String::from(".");
 
