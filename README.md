@@ -4,7 +4,9 @@
 
 A simple [sigal](https://github.com/saimn/sigal) clone written in Rust.
 
-<a href="https://matze.github.io/splat/"><img alt="Example output" src="https://i.imgur.com/EHyhrRw.jpg"/></a>
+<a href="https://matze.github.io/splat/"><img alt="Example output" src="https://github.com/matze/splat/blob/master/example/screenshot.jpg"/></a>
+
+<p align="center"><strong><a href="https://matze.github.io/splat/">DEMO OUTPUT</a></strong></p>
 
 ### Usage
 
