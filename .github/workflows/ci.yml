@@ -1,0 +1,25 @@
+on: [push, pull_request]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+
+      - name: install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: check formatting
+        run: cargo fmt --check
+
+      - name: run clippy
+        run: cargo clippy
+
+      - name: run tests
+        run: cargo test
