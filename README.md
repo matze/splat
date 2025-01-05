@@ -18,6 +18,17 @@ a source directory of image files. It is a spiritual cousin of
 - Clean and beautiful Tailwind CSS based builtin theme.
 
 
+## Installation
+
+For 64-bit Linux systems you can install pre-built binaries from the
+[releases](https://github.com/matze/splat/releases). For other systems, building
+and installing from source can be done via
+
+```bash
+cargo install --path .
+```
+
+
 ## Usage
 
 **splat** is a command line application and besides a source directory of image
