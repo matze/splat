@@ -48,7 +48,7 @@
     <!-- Navigation -->
     <div class="flex flex-row space-x-3 font-bold uppercase text-3xl text-zinc-100 my-8">
       {% for breadcrumb in collection.breadcrumbs %}
-      <div><a href="{{ breadcrumb.path }}">{{ breadcrumb.title }}</a></div>
+      <div><a class="no-underline hover:underline underline-offset-4 decoration-2 transition-all" href="{{ breadcrumb.path }}">{{ breadcrumb.title }}</a></div>
       {% if not loop.last %}<div>›</div>{% endif %}
       {% endfor %}
     </div>
