@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ collection.title }}</title>
   <link rel="stylesheet" href="{{ theme_url }}/css/app.css">
   <link rel="stylesheet" href="{{ theme_url }}/css/photoswipe.css">
   <style>
@@ -45,9 +46,9 @@
 <body class="bg-zinc-800 text-white font-display">
   <main class="container mx-auto px-4">
     <!-- Navigation -->
-    <div class="flex flex-row space-x-3 font-bold uppercase text-4xl text-zinc-100 my-8">
+    <div class="flex flex-row space-x-3 font-bold uppercase text-3xl text-zinc-100 my-8">
       {% for breadcrumb in collection.breadcrumbs %}
-      <div><a href="{{ breadcrumb.path }}">{{ breadcrumb.title }}</a></div>
+      <div><a class="no-underline hover:underline underline-offset-4 decoration-2 transition-all" href="{{ breadcrumb.path }}">{{ breadcrumb.title }}</a></div>
       {% if not loop.last %}<div>›</div>{% endif %}
       {% endfor %}
     </div>
@@ -61,7 +62,7 @@
         <div class="brightness-50 hover:brightness-100 transition-all">
           <img class="rounded-lg" src="{{ child.thumbnail }}" />
         </div>
-        <div class="absolute bottom-0 inset-x-0 m-2 text-2xl font-bold">{{ child.title }}</div>
+        <div class="absolute bottom-0 inset-x-0 m-2 text-xl font-bold">{{ child.title }}</div>
         </a>
       </div>
       {% endfor %}
