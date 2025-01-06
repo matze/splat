@@ -81,6 +81,12 @@
       {% endfor %}
     </div>
     {% endif %}
+
+    {% if collection.description %}
+    <div class="text-xl my-16">
+    {{ collection.description }}
+    </div>
+    {% endif %}
   </main>
 </body>
 </html>

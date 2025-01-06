@@ -33,7 +33,8 @@ cargo install --path .
 
 **splat** is a command line application and besides a source directory of image
 files it requires a `splat.toml` configuration file and a theme file containing
-an HTML template as well as optional assets.
+an HTML template as well as optional assets and descriptions in `index.md`
+files.
 
 To create an example configuration run `splat new` and edit `splat.toml` to your
 liking, especially adapt the `input` and `output` paths. `output` will be
@@ -44,6 +45,17 @@ output.
 > The example theme relies on the Tailwind CSS v4.0 beta compiler. Make sure to
 > install it if you want to use the theme.
 
+You can adjust the chosen collection thumbnail and title (which defaults to the
+directory name) as well as add a description by adding an `index.md` file. The
+first rows matching `Title: ` or `Thumbnail: ` will override the defaults,
+anything else will be used as a description. Here is an example:
+
+```markdown
+Title: Sunny vacation
+Thumbnail: beach.jpg
+
+Vacation was _just_ perfect!
+```
 
 ## Templates
 

@@ -7,9 +7,13 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
+/// Metadata read from `index.md`s at the root of a collection's directory.
 pub struct Metadata {
+    /// Free text description.
     pub description: String,
+    /// Override title defaulting to a collections directory name else.
     pub title: String,
+    /// Override thumbnail image to use.
     pub thumbnail: Option<PathBuf>,
 }
 
