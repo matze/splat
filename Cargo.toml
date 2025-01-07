@@ -21,3 +21,7 @@ tempfile = "3"
 
 [lints.clippy]
 unwrap_used = "deny"
+
+[profile.release]
+codegen-units = 1
+lto = true
