@@ -42,7 +42,7 @@ created if it does not exist. Then run `splat build` to generate the static
 output.
 
 > [!IMPORTANT]
-> The example theme relies on the Tailwind CSS v4.0 beta compiler. Make sure to
+> The example theme relies on the Tailwind CSS v4.0 compiler. Make sure to
 > install it if you want to use the theme.
 
 You can adjust the chosen collection thumbnail and title (which defaults to the
