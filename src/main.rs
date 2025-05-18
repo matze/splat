@@ -236,7 +236,7 @@ impl Collection {
             .filter_map(Result::ok)
             .filter(|e| {
                 e.path().is_file()
-                    && e.path().extension().map_or(false, |ext| {
+                    && e.path().extension().is_some_and(|ext| {
                         ext == "JPG" || ext == "jpg" || ext == "JPEG" || ext == "jpeg"
                     })
             })
