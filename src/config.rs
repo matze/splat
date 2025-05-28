@@ -1,6 +1,6 @@
 use crate::process::is_older;
 use anyhow::{anyhow, Context, Result};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::fs::read_to_string;
 use std::path::PathBuf;

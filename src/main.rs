@@ -8,7 +8,7 @@ use config::Config;
 use metadata::Metadata;
 use process::{copy_recursively, is_older, process, Process};
 use rayon::prelude::*;
-use serde_derive::Serialize;
+use serde::Serialize;
 use std::fs::{create_dir_all, read_dir, write};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
