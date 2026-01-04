@@ -13,7 +13,6 @@ use std::fs::{create_dir_all, read_dir, write};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
-use std::sync::LazyLock;
 use std::thread;
 
 #[derive(Parser)]
@@ -97,9 +96,6 @@ struct Output<'a> {
     /// Images part of this collection.
     images: Vec<Image<'a>>,
 }
-
-/// Spinner images.
-static SPINNERS: LazyLock<[&str; 4]> = LazyLock::new(|| ["⠖", "⠲", "⠴", "⠦"]);
 
 /// Compute breadcrumb links from a list of strings.
 fn breadcrumbs_to_links(breadcrumbs: &[String]) -> Vec<Link<'_>> {
@@ -346,13 +342,12 @@ fn build(config: &Config) -> Result<()> {
 }
 
 fn display_progress(num_items: usize, receiver: mpsc::Receiver<Result<()>>) {
-    let num_spinners = SPINNERS.len();
+    let spinner = ["⠖", "⠲", "⠴", "⠦"].iter().cycle();
 
-    for i in 0..num_items {
+    for (spinner, remaining) in spinner.zip(num_items..0) {
         print!(
-            "\x1B[2K\r\x1B[0;36m{}\x1B[0;m Processing {} images ...",
-            SPINNERS[i % num_spinners],
-            num_items - i
+            "\x1B[2K\r\x1B[0;36m{spinner}\x1B[0;m Processing {} images ...",
+            remaining
         );
 
         if let Err(err) = io::stdout().flush() {
