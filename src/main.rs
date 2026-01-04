@@ -102,7 +102,7 @@ struct Output<'a> {
 static SPINNERS: LazyLock<[&str; 4]> = LazyLock::new(|| ["⠖", "⠲", "⠴", "⠦"]);
 
 /// Compute breadcrumb links from a list of strings.
-fn breadcrumbs_to_links(breadcrumbs: &[String]) -> Vec<Link> {
+fn breadcrumbs_to_links(breadcrumbs: &[String]) -> Vec<Link<'_>> {
     let mut path = String::from(".");
 
     let mut links: Vec<_> = breadcrumbs
