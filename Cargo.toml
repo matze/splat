@@ -3,6 +3,7 @@ name = "splat"
 version = "1.1.0"
 authors = ["Matthias Vogelgesang"]
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 anyhow = "1"
